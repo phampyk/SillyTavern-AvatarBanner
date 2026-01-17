@@ -1,0 +1,11 @@
+{
+    "display_name": "Avatar Banners",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "author": "Kaede",
+    "version": "3.0.0",
+    "homePage": "https://github.com/",
+    "auto_update": false
+}
