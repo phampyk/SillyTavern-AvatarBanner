@@ -1,11 +1,11 @@
 {
-    "display_name": "Avatar Banners",
+    "display_name": "Avatar Banner",
     "loading_order": 100,
     "requires": [],
     "optional": [],
     "js": "index.js",
-    "author": "Kaede",
+    "author": "phampyk",
     "version": "3.0.0",
-    "homePage": "https://github.com/",
+    "homePage": "https://github.com/phampyk/SillyTavern-AvatarBanner",
     "auto_update": false
 }
