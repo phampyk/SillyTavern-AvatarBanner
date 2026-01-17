@@ -50,4 +50,4 @@ On the next page press `Get Embed Code` and lastly the `@import`. Copy that code
 ![troubleshoot 2](/img/Troubleshoot-2.png)
 ![troubleshoot 3](/img/Troubleshoot-3.png)
 
-Do you like the theme from the screenshot. Is my '[Purple Clouds](https://github.com/phampyk/SillyTavern-PurpleCloudsTheme)' theme with cattpuccin frappe colors! and [this wallpaper](https://github.com/orangci/walls-catppuccin-mocha/blob/master/flowers-1.jpg)
+Do you like the theme from the screenshot. Is my '[Purple Clouds](https://github.com/phampyk/SillyTavern-PurpleCloudsTheme)' theme with cattpuccin frappe colors! and [this wallpaper](https://github.com/notAxon/wallpapers/blob/main/catppuccin/Pink_Flowers_Photograph_by_Lisa_Fotios.jpeg)
