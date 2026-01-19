@@ -4,14 +4,28 @@
  * 
  * Stores banners PER-CHARACTER in character card data using writeExtensionField
  * User/persona banners stored in extension_settings
+ * 
+ * @version 3.2.4
+ * @compatibility Works with chat-name extension (uses _originalName for CSS selectors)
+ * @feature Optional display name override for cleaner styled names (uses JS text replacement for mobile compatibility)
+ * @fix Group chat font styling - aggressive CSS specificity and forced font loading with cache busting
+ * @compliance Full production compliance - memory leak prevention, proper cleanup tracking, error handling
  */
 
 import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings } from '../../../extensions.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
+import { callGenericPopup, POPUP_TYPE } from '../../../popup.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
+
+// Namespaced state for proper cleanup (prevents memory leaks)
+const ExtensionState = {
+    cleanupFunctions: [],
+    observer: null,
+    initialized: false,
+};
 
 // Default settings (global settings only - banners stored per-character)
 const defaultSettings = {
@@ -25,7 +39,8 @@ const defaultSettings = {
     accentColor: '#e79fa8', // Default pinkish color
     fontSize: 36, // Name text font size
     namePaddingTB: 6, // Name text padding top/bottom (px)
-    namePaddingLR: 10 // Name text padding left/right (px)
+    namePaddingLR: 10, // Name text padding left/right (px)
+    useDisplayName: false, // Use short display name instead of full card name (for CharacterName ext)
 };
 
 /**
@@ -52,50 +67,78 @@ function saveSettings() {
  * Get the current character's avatar path
  */
 function getCurrentCharacterAvatar() {
-    const context = SillyTavern.getContext();
-    if (!context.characters || context.characterId === undefined) {
+    try {
+        const context = SillyTavern.getContext();
+        if (!context.characters || context.characterId === undefined) {
+            return null;
+        }
+        const char = context.characters[context.characterId];
+        return char?.avatar || null;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error getting character avatar:', error);
         return null;
     }
-    const char = context.characters[context.characterId];
-    return char?.avatar || null;
 }
 
 /**
  * Check if we're in a group chat
  */
 function isGroupChat() {
-    const context = SillyTavern.getContext();
-    return !!context.groupId;
+    try {
+        const context = SillyTavern.getContext();
+        return !!context.groupId;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error checking group chat:', error);
+        return false;
+    }
 }
 
 /**
  * Get the current group object
  */
 function getCurrentGroup() {
-    const context = SillyTavern.getContext();
-    if (!context.groupId || !context.groups) {
+    try {
+        const context = SillyTavern.getContext();
+        if (!context.groupId || !context.groups) {
+            return null;
+        }
+        return context.groups.find(g => g.id === context.groupId) || null;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error getting current group:', error);
         return null;
     }
-    return context.groups.find(g => g.id === context.groupId) || null;
 }
 
 /**
  * Get character ID by avatar filename
  */
 function getCharacterIdByAvatar(avatarFilename) {
-    const context = SillyTavern.getContext();
-    if (!context.characters) return undefined;
-    return context.characters.findIndex(c => c.avatar === avatarFilename);
+    try {
+        const context = SillyTavern.getContext();
+        if (!context.characters) return undefined;
+        return context.characters.findIndex(c => c.avatar === avatarFilename);
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error getting character by avatar:', error);
+        return undefined;
+    }
 }
 
 /**
- * Get character ID by name
+ * Get character ID by name (supports chat-name extension via _originalName)
  */
 function getCharacterIdByName(name) {
-    const context = SillyTavern.getContext();
-    if (!context.characters) return undefined;
-    const index = context.characters.findIndex(c => c.name === name);
-    return index >= 0 ? index : undefined;
+    try {
+        const context = SillyTavern.getContext();
+        if (!context.characters) return undefined;
+        // Check both name and _originalName for chat-name extension compatibility
+        const index = context.characters.findIndex(c => 
+            c.name === name || c._originalName === name
+        );
+        return index >= 0 ? index : undefined;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error getting character by name:', error);
+        return undefined;
+    }
 }
 
 /**
@@ -116,29 +159,35 @@ function getPersonaImageUrlFullRes(avatarFilename) {
  * Get banner for a character from their card data
  */
 async function getCharacterBanner(characterId) {
-    const context = SillyTavern.getContext();
-    const character = context.characters?.[characterId];
-    return character?.data?.extensions?.[extensionName]?.banner || null;
+    try {
+        const context = SillyTavern.getContext();
+        const character = context.characters?.[characterId];
+        return character?.data?.extensions?.[extensionName]?.banner || null;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error getting character banner:', error);
+        return null;
+    }
 }
 
 /**
- * Save banner to character card data
+ * Save banner to character card data using ST's writeExtensionField
  */
 async function saveCharacterBanner(characterId, bannerDataUrl) {
-    const context = SillyTavern.getContext();
-    const { writeExtensionField } = context;
-    
-    if (!writeExtensionField) {
-        console.error(`[${extensionName}] writeExtensionField not available`);
-        toastr.error('Cannot save banner - API not available');
-        return false;
-    }
-    
     try {
+        const context = SillyTavern.getContext();
+        const { writeExtensionField } = context;
+        
+        if (!writeExtensionField) {
+            console.error(`[${extensionName}]`, 'writeExtensionField not available');
+            toastr.error('Cannot save banner - API not available');
+            return false;
+        }
+        
         await writeExtensionField(characterId, extensionName, { banner: bannerDataUrl });
+        console.log(`[${extensionName}]`, 'Banner saved for character ID:', characterId);
         return true;
     } catch (error) {
-        console.error(`[${extensionName}] Error saving banner:`, error);
+        console.error(`[${extensionName}]`, 'Error saving banner:', error);
         toastr.error('Failed to save banner');
         return false;
     }
@@ -148,18 +197,19 @@ async function saveCharacterBanner(characterId, bannerDataUrl) {
  * Remove banner from character card data
  */
 async function removeCharacterBanner(characterId) {
-    const context = SillyTavern.getContext();
-    const { writeExtensionField } = context;
-    
-    if (!writeExtensionField) {
-        return false;
-    }
-    
     try {
+        const context = SillyTavern.getContext();
+        const { writeExtensionField } = context;
+        
+        if (!writeExtensionField) {
+            return false;
+        }
+        
         await writeExtensionField(characterId, extensionName, { banner: null });
+        console.log(`[${extensionName}]`, 'Banner removed for character ID:', characterId);
         return true;
     } catch (error) {
-        console.error(`[${extensionName}] Error removing banner:`, error);
+        console.error(`[${extensionName}]`, 'Error removing banner:', error);
         return false;
     }
 }
@@ -179,6 +229,7 @@ function saveUserBanner(avatarPath, bannerDataUrl) {
     const settings = getSettings();
     settings.userBanners[avatarPath] = bannerDataUrl;
     saveSettings();
+    console.log(`[${extensionName}]`, 'User banner saved for:', avatarPath);
 }
 
 /**
@@ -188,56 +239,40 @@ function removeUserBanner(avatarPath) {
     const settings = getSettings();
     delete settings.userBanners[avatarPath];
     saveSettings();
+    console.log(`[${extensionName}]`, 'User banner removed for:', avatarPath);
 }
 
 /**
- * Show popup with options to Edit or Delete banner
+ * Show popup with options to Edit or Delete banner using ST's native popup API
  */
 async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
-    const context = SillyTavern.getContext();
-    const { Popup, POPUP_TYPE } = context;
-    
-    if (!Popup || !POPUP_TYPE) {
-        // Fallback: just open editor
-        onEdit();
-        return;
-    }
-    
-    // Use a simple confirm popup first asking if they want to remove
-    const removeConfirm = new Popup(
-        `Banner exists for ${displayName}`,
-        POPUP_TYPE.CONFIRM,
-        `<div style="text-align: center;">
-            <p>A banner is already configured.</p>
-            <p><b>Remove</b> the banner, or <b>Edit</b> it?</p>
-        </div>`,
-        {
-            okButton: 'Edit',
-            cancelButton: 'Remove',
-        }
-    );
-    
-    const result = await removeConfirm.show();
-    
-    // result is true for OK (Edit), false/null for Cancel (Remove)
-    if (result === true || result === 1) {
-        onEdit();
-    } else if (result === false || result === 0) {
-        // Confirm deletion
-        const deleteConfirm = new Popup(
-            'Confirm Removal',
+    try {
+        const result = await callGenericPopup(
+            `<p>A banner is already configured for <b>${displayName}</b>.</p><p>What would you like to do?</p>`,
             POPUP_TYPE.CONFIRM,
-            '<p>Are you sure you want to remove this banner?</p>',
-            {
-                okButton: 'Yes, Remove',
-                cancelButton: 'Cancel',
-            }
+            '',
+            { okButton: 'Edit', cancelButton: 'Remove' }
         );
         
-        const confirmResult = await deleteConfirm.show();
-        if (confirmResult === true || confirmResult === 1) {
-            onDelete();
+        if (result) {
+            // Edit
+            await onEdit();
+        } else if (result === false) {
+            // Remove - confirm first
+            const confirmResult = await callGenericPopup(
+                '<p>Are you sure you want to remove this banner?</p>',
+                POPUP_TYPE.CONFIRM,
+                '',
+                { okButton: 'Yes, Remove', cancelButton: 'Cancel' }
+            );
+            
+            if (confirmResult) {
+                await onDelete();
+            }
         }
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error showing banner options popup:', error);
+        toastr.error('Error showing options');
     }
 }
 
@@ -250,22 +285,18 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
         return;
     }
 
-    const context = SillyTavern.getContext();
-    const { Popup, POPUP_TYPE } = context;
-
-    if (!Popup || !POPUP_TYPE) {
-        toastr.error('Popup API not available');
-        return;
-    }
-
-    let avatarUrl;
-    if (isUser) {
-        avatarUrl = getPersonaImageUrlFullRes(avatarPath);
-    } else {
-        avatarUrl = `/characters/${avatarPath}`;
-    }
-
     try {
+        // Construct avatar URL
+        let avatarUrl;
+        if (isUser) {
+            avatarUrl = getPersonaImageUrlFullRes(avatarPath);
+        } else {
+            avatarUrl = `/characters/${avatarPath}`;
+        }
+
+        console.log(`[${extensionName}]`, 'Loading avatar from:', avatarUrl);
+
+        // Fetch and convert to base64
         const response = await fetch(avatarUrl);
         if (!response.ok) {
             throw new Error(`Failed to load avatar: ${response.status}`);
@@ -278,32 +309,33 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
             reader.readAsDataURL(blob);
         });
 
-        const popup = new Popup(
+        console.log(`[${extensionName}]`, 'Avatar loaded, opening crop editor');
+
+        // Use ST's native POPUP_TYPE.CROP API (from popup.js line 358-376, 576-581)
+        const croppedDataUrl = await callGenericPopup(
             `Configure banner for ${displayName}`,
             POPUP_TYPE.CROP,
-            '',
+            dataUrl,
             {
+                cropAspect: 4, // 4:1 aspect ratio for wide banners
                 cropImage: dataUrl,
-                cropAspect: 4,
                 okButton: 'Save Banner',
                 cancelButton: 'Cancel',
             }
         );
 
-        const result = await popup.show();
-
-        if (result && typeof result === 'string' && result.startsWith('data:')) {
+        if (croppedDataUrl && typeof croppedDataUrl === 'string' && croppedDataUrl.startsWith('data:')) {
             if (isUser) {
-                saveUserBanner(avatarPath, result);
+                saveUserBanner(avatarPath, croppedDataUrl);
             } else {
-                await saveCharacterBanner(characterId, result);
+                await saveCharacterBanner(characterId, croppedDataUrl);
             }
             
             applyBannersToChat();
             toastr.success(`Banner saved for ${displayName}`);
         }
     } catch (error) {
-        console.error(`[${extensionName}] Error in banner editor:`, error);
+        console.error(`[${extensionName}]`, 'Error in banner editor:', error);
         toastr.error(`Failed to load avatar image: ${error.message}`);
     }
 }
@@ -312,30 +344,35 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
  * Handle banner button click - show options if banner exists, otherwise open editor
  */
 async function handleBannerButtonClick(avatarPath, displayName, isUser, characterId = null) {
-    let existingBanner;
-    
-    if (isUser) {
-        existingBanner = getUserBanner(avatarPath);
-    } else {
-        existingBanner = await getCharacterBanner(characterId);
-    }
-    
-    if (existingBanner) {
-        showBannerOptionsPopup(
-            displayName,
-            () => openBannerEditor(avatarPath, displayName, isUser, characterId),
-            async () => {
-                if (isUser) {
-                    removeUserBanner(avatarPath);
-                } else {
-                    await removeCharacterBanner(characterId);
+    try {
+        let existingBanner;
+        
+        if (isUser) {
+            existingBanner = getUserBanner(avatarPath);
+        } else {
+            existingBanner = await getCharacterBanner(characterId);
+        }
+        
+        if (existingBanner) {
+            await showBannerOptionsPopup(
+                displayName,
+                () => openBannerEditor(avatarPath, displayName, isUser, characterId),
+                async () => {
+                    if (isUser) {
+                        removeUserBanner(avatarPath);
+                    } else {
+                        await removeCharacterBanner(characterId);
+                    }
+                    applyBannersToChat();
+                    toastr.info(`Banner removed for ${displayName}`);
                 }
-                applyBannersToChat();
-                toastr.info(`Banner removed for ${displayName}`);
-            }
-        );
-    } else {
-        openBannerEditor(avatarPath, displayName, isUser, characterId);
+            );
+        } else {
+            await openBannerEditor(avatarPath, displayName, isUser, characterId);
+        }
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error handling banner button click:', error);
+        toastr.error('Error processing banner');
     }
 }
 
@@ -419,11 +456,6 @@ function rgba(rgb, alpha) {
 
 /**
  * Parse font input and return { importStatement, fontFamily }
- * Accepts multiple formats:
- * - Full @import with style tags: <style> @import url('...'); </style>
- * - Just @import: @import url('...');
- * - Just URL: https://fonts.googleapis.com/css2?family=...
- * - Just font name: Bagel Fat One
  */
 function parseFontInput(input) {
     if (!input || input.trim() === '') {
@@ -431,8 +463,6 @@ function parseFontInput(input) {
     }
     
     const trimmed = input.trim();
-    
-    // Try to extract URL from various formats
     let url = null;
     let fontFamily = null;
     
@@ -441,21 +471,17 @@ function parseFontInput(input) {
     
     if (urlMatch) {
         url = urlMatch[0];
-        
-        // Extract font family name from URL (family=Font+Name or family=Font+Name:...)
         const familyMatch = url.match(/family=([^&:]+)/);
         if (familyMatch) {
-            // Convert URL format back to readable name (Bagel+Fat+One -> Bagel Fat One)
             fontFamily = decodeURIComponent(familyMatch[1].replace(/\+/g, ' '));
         }
-        
         return {
             importStatement: `@import url('${url}');`,
             fontFamily: fontFamily || ''
         };
     }
     
-    // No URL found - treat as plain font name, construct basic URL
+    // No URL found - treat as plain font name
     fontFamily = trimmed;
     const formattedName = fontFamily.replace(/\s+/g, '+');
     url = `https://fonts.googleapis.com/css2?family=${formattedName}&display=swap`;
@@ -467,15 +493,75 @@ function parseFontInput(input) {
 }
 
 /**
- * Generate Google Fonts import statement from user input
- * Wrapper for parseFontInput that returns just the import statement
+ * Get Google Fonts import statement from user input with cache busting
  */
 function getGoogleFontImport(input) {
-    return parseFontInput(input).importStatement;
+    const parsed = parseFontInput(input);
+    if (!parsed.importStatement) return '';
+    
+    // Extract URL from @import statement
+    const urlMatch = parsed.importStatement.match(/url\(['"]?([^'"]+)['"]?\)/);
+    if (!urlMatch) return parsed.importStatement;
+    
+    const fontUrl = urlMatch[1];
+    // Add cache buster timestamp
+    const cacheBustedUrl = fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
+    
+    return `@import url('${cacheBustedUrl}');`;
 }
 
 /**
- * Get the font family name from user input (for CSS font-family property)
+ * Force load Google Font by injecting link element (more reliable than @import)
+ * Properly tracked for cleanup to prevent memory leaks
+ */
+function preloadGoogleFont(input) {
+    const parsed = parseFontInput(input);
+    if (!parsed.importStatement) return;
+    
+    const urlMatch = parsed.importStatement.match(/url\(['"]?([^'"]+)['"]?\)/);
+    if (!urlMatch) return;
+    
+    const fontUrl = urlMatch[1];
+    
+    // Remove old preload if exists (cleanup old elements)
+    const oldPreload = document.getElementById('avatar-banner-font-preload');
+    if (oldPreload) oldPreload.remove();
+    
+    // Add preload link for faster loading
+    const preload = document.createElement('link');
+    preload.id = 'avatar-banner-font-preload';
+    preload.rel = 'preload';
+    preload.as = 'style';
+    preload.href = fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
+    
+    // Track for cleanup (CRITICAL for memory management)
+    ExtensionState.cleanupFunctions.push(() => {
+        const el = document.getElementById('avatar-banner-font-preload');
+        if (el) el.remove();
+    });
+    
+    document.head.appendChild(preload);
+    
+    // Also add direct link element (more reliable than @import in some browsers)
+    const oldLink = document.getElementById('avatar-banner-font-link');
+    if (oldLink) oldLink.remove();
+    
+    const link = document.createElement('link');
+    link.id = 'avatar-banner-font-link';
+    link.rel = 'stylesheet';
+    link.href = fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
+    
+    // Track for cleanup (CRITICAL for memory management)
+    ExtensionState.cleanupFunctions.push(() => {
+        const el = document.getElementById('avatar-banner-font-link');
+        if (el) el.remove();
+    });
+    
+    document.head.appendChild(link);
+}
+
+/**
+ * Get the font family name from user input
  */
 function getFontFamilyName(input) {
     return parseFontInput(input).fontFamily;
@@ -483,17 +569,19 @@ function getFontFamilyName(input) {
 
 /**
  * Generate extra styling CSS for characters/personas with banners
+ * @param {string} characterName - The name used for CSS selector (original card name)
+ * @param {boolean} isUser - Whether this is for user messages
+ * @param {object} settings - Extension settings
+ * @param {string} displayName - The name to display (can be different from characterName)
  */
-function generateExtraStylingCSS(characterName, isUser, settings) {
+function generateExtraStylingCSS(characterName, isUser, settings, displayName = null) {
     const rgb = hexToRgb(settings.accentColor);
     const paddingTop = Math.max(settings.bannerHeight - 30, 50);
-    // Non-linear formula: smaller banners need more subtraction, larger need less
     const paddingTopMobile = Math.max(Math.round(settings.bannerHeight * 0.45 - 23), 20);
-    // Parse font input to get the actual font family name
     const parsedFontName = getFontFamilyName(settings.fontFamily);
     const fontFamily = parsedFontName ? `"${parsedFontName}", cursive` : '"Caveat", cursive';
     const fontSize = settings.fontSize || 36;
-    const fontSizeMobile = Math.max(Math.round(fontSize * 0.7), 20); // 70% size on mobile
+    const fontSizeMobile = Math.max(Math.round(fontSize * 0.7), 20);
     const namePaddingTB = Number.isFinite(settings.namePaddingTB) ? settings.namePaddingTB : 6;
     const namePaddingLR = Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 10;
     
@@ -507,34 +595,33 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
     
     let css = '';
     
-    // Name text styling - remove italic which can cause clipping issues
+    // Name text styling - Use highly specific selector to override ST defaults
     css += `/* Extra Styling - Name Text */\n`;
-    css += `${selector} .name_text {\n`;
+    css += `#chat ${selector} .ch_name .name_text,\n`;
+    css += `${selector} .ch_name .name_text {\n`;
     css += `    display: inline-block !important;\n`;
     css += `    font-size: ${fontSize}px !important;\n`;
     css += `    font-family: ${fontFamily} !important;\n`;
-    css += `    line-height: 1.6;\n`;
-    css += `    text-align: left;\n`;
+    css += `    line-height: 1.6 !important;\n`;
+    css += `    text-align: left !important;\n`;
     css += `    padding: ${namePaddingTB}px ${namePaddingLR}px !important;\n`;
-    css += `    margin: 0;\n`;
+    css += `    margin: 0 !important;\n`;
     css += `    overflow: visible !important;\n`;
     css += `    clip: unset !important;\n`;
     css += `    clip-path: none !important;\n`;
     css += `    text-overflow: unset !important;\n`;
     css += `    white-space: normal !important;\n`;
-    css += `    min-height: 1.6em;\n`;
-    css += `    /* Gradient text color */\n`;
+    css += `    min-height: 1.6em !important;\n`;
     css += `    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.8), ${rgba(rgb, 1)}) !important;\n`;
     css += `    -webkit-background-clip: text !important;\n`;
     css += `    background-clip: text !important;\n`;
     css += `    -webkit-text-fill-color: transparent !important;\n`;
     css += `    color: transparent !important;\n`;
-    css += `    /* Glow effect (post-render) */\n`;
     css += `    text-shadow: none !important;\n`;
     css += `    filter: drop-shadow(0 0 5px ${rgba(rgb, 0.3)}) drop-shadow(0 0 1px rgba(255, 255, 255, 0.3)) !important;\n`;
     css += `}\n\n`;
     
-    // Ensure ALL parent containers don't clip - be very aggressive
+    // Ensure parent containers don't clip
     css += `${selector} .ch_name,\n`;
     css += `${selector} .mes_block,\n`;
     css += `${selector} .mesIDDisplay,\n`;
@@ -543,7 +630,7 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
     css += `    text-overflow: unset !important;\n`;
     css += `}\n\n`;
     
-    // Name text children (icons, timestamp, etc.)
+    // Name text children
     css += `${selector} .name_text img,\n`;
     css += `${selector} .name_text span,\n`;
     css += `${selector} .name_text svg,\n`;
@@ -572,16 +659,14 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
     css += `    transition: all 0.3s ease-in-out;\n`;
     css += `}\n\n`;
     
-    // Message container styling (with calculated padding)
-    // Use appropriate blur tint color for user vs bot messages
+    // Message container styling
     const blurTintVar = isUser ? '--SmartThemeUserMesBlurTintColor' : '--SmartThemeBotMesBlurTintColor';
     
     if (isUser) {
         // USER MESSAGES: Split styling
-        // Base styling (background, border, side padding) applies to ALL user messages in banner mode
         css += `#chat ${selector} {\n`;
         css += `    position: relative;\n`;
-        css += `    padding: 15px 25px 15px 25px !important;\n`;  // Normal padding, no banner space
+        css += `    padding: 15px 25px 15px 25px !important;\n`;
         css += `    background:\n`;
         css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
         css += `        var(${blurTintVar});\n`;
@@ -589,12 +674,11 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
         css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
         css += `}\n\n`;
         
-        // Extra top padding ONLY for messages with actual banners
         css += `#chat ${selector}.has-avatar-banner {\n`;
         css += `    padding-top: ${paddingTop}px !important;\n`;
         css += `}\n\n`;
         
-        // Mobile responsive styles
+        // Mobile
         css += `@media screen and (max-width: 768px) {\n`;
         css += `    #chat ${selector} {\n`;
         css += `        padding: 10px 15px 10px 15px !important;\n`;
@@ -608,7 +692,7 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
         css += `    }\n`;
         css += `}\n\n`;
     } else {
-        // CHARACTER MESSAGES: Original behavior (styling only for messages with banners)
+        // CHARACTER MESSAGES: Original behavior
         css += `#chat ${selector}.has-avatar-banner {\n`;
         css += `    position: relative;\n`;
         css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
@@ -619,7 +703,7 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
         css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
         css += `}\n\n`;
         
-        // Mobile responsive styles
+        // Mobile
         css += `@media screen and (max-width: 768px) {\n`;
         css += `    #chat ${selector}.has-avatar-banner {\n`;
         css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
@@ -636,338 +720,402 @@ function generateExtraStylingCSS(characterName, isUser, settings) {
 
 /**
  * Update dynamic CSS rules for current chat
- * Uses ch_name attribute to target specific characters
- * Supports both single-character and group chats
  */
 async function updateDynamicCSS() {
-    const settings = getSettings();
-    const styleEl = getDynamicStyleElement();
-    
-    if (!settings.enabled) {
-        styleEl.textContent = '';
-        return;
-    }
-    
-    const context = SillyTavern.getContext();
-    const inGroupChat = isGroupChat();
-    
-    let css = '';
-    
-    // Calculate padding - mobile uses non-linear formula
-    const paddingTop = Math.max(settings.bannerHeight - 30, 50);
-    const paddingTopMobile = Math.max(Math.round(settings.bannerHeight * 0.45 - 23), 20);
-    
-    // Track if ANY character has a banner (determines user message styling)
-    let anyCharacterHasBanner = false;
-    
-    // Collect all characters we need to process
-    let charactersToProcess = [];
-    
-    if (inGroupChat) {
-        // GROUP CHAT: Process all group members
-        const group = getCurrentGroup();
-        if (group && group.members) {
-            css += `/* Avatar Banner - Group Chat: ${group.name} */\n`;
-            css += `/* Members: ${group.members.join(', ')} */\n\n`;
+    try {
+        const settings = getSettings();
+        const styleEl = getDynamicStyleElement();
+        
+        if (!settings.enabled) {
+            styleEl.textContent = '';
+            return;
+        }
+        
+        const context = SillyTavern.getContext();
+        const inGroupChat = isGroupChat();
+        
+        let css = '';
+        const paddingTop = Math.max(settings.bannerHeight - 30, 50);
+        const paddingTopMobile = Math.max(Math.round(settings.bannerHeight * 0.45 - 23), 20);
+        
+        let anyCharacterHasBanner = false;
+        let charactersToProcess = [];
+        
+        if (inGroupChat) {
+            const group = getCurrentGroup();
+            if (group && group.members) {
+                css += `/* Avatar Banner - Group Chat: ${group.name} */\n`;
+                css += `/* Members: ${group.members.join(', ')} */\n\n`;
+                
+                for (const memberAvatar of group.members) {
+                    const charId = getCharacterIdByAvatar(memberAvatar);
+                    if (charId !== undefined && charId >= 0) {
+                        const character = context.characters[charId];
+                        if (character) {
+                            charactersToProcess.push({
+                                id: charId,
+                                name: character.name,
+                                avatar: character.avatar
+                            });
+                        }
+                    }
+                }
+            }
+        } else {
+            const currentCharId = context.characterId;
+            if (currentCharId !== undefined) {
+                const character = context.characters?.[currentCharId];
+                if (character) {
+                    css += `/* Avatar Banner - Single Chat: ${character.name} */\n\n`;
+                    charactersToProcess.push({
+                        id: currentCharId,
+                        name: character.name,
+                        avatar: character.avatar
+                    });
+                }
+            }
+        }
+        
+        let fontImportAdded = false;
+        
+        // Process each character
+        for (const charInfo of charactersToProcess) {
+            const banner = await getCharacterBanner(charInfo.id);
+            const hasBanner = !!banner;
             
-            for (const memberAvatar of group.members) {
-                const charId = getCharacterIdByAvatar(memberAvatar);
-                if (charId !== undefined && charId >= 0) {
-                    const character = context.characters[charId];
-                    if (character) {
-                        charactersToProcess.push({
-                            id: charId,
-                            name: character.name,
-                            avatar: character.avatar
+            if (hasBanner) {
+                anyCharacterHasBanner = true;
+                
+                if (!fontImportAdded && settings.extraStylingEnabled && settings.fontFamily) {
+                    // Preload font for faster/more reliable loading
+                    preloadGoogleFont(settings.fontFamily);
+                    css += getGoogleFontImport(settings.fontFamily) + '\n\n';
+                    fontImportAdded = true;
+                }
+            }
+            
+            // CRITICAL: Get character from context to check for _originalName
+            const character = context.characters[charInfo.id];
+            
+            // For CSS selector: Use _originalName if it exists (matches DOM ch_name attribute)
+            // The DOM ch_name is set from the CHARACTER CARD NAME, not the display name
+            const nameForSelector = character?._originalName || character?.name || charInfo.name;
+            const escapedName = escapeCSS(nameForSelector);
+            
+            // For display: Use character.name (the display name from CharacterName extension)
+            const displayName = character?.name || charInfo.name;
+            
+            // Debug logging for group chats (wrapped for safety)
+            if (inGroupChat && hasBanner) {
+                try {
+                    console.log(`[${extensionName}] Processing ${displayName}:`, {
+                        originalName: character?._originalName,
+                        displayName: displayName,
+                        nameForSelector: nameForSelector,
+                        hasBanner: hasBanner,
+                        extraStyling: settings.extraStylingEnabled
+                    });
+                } catch (logError) {
+                    // Silently fail on logging errors
+                }
+            }
+            
+            if (hasBanner) {
+                css += `/* ${displayName} - Has Banner */\n`;
+                css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
+                css += `    display: none !important;\n`;
+                css += `}\n`;
+                
+                if (!settings.extraStylingEnabled) {
+                    css += `#chat .mes[ch_name="${escapedName}"] {\n`;
+                    css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                    css += `}\n`;
+                    css += `@media screen and (max-width: 768px) {\n`;
+                    css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
+                    css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
+                    css += `    }\n`;
+                    css += `}\n`;
+                }
+                css += `\n`;
+                
+                if (settings.extraStylingEnabled) {
+                    // Pass nameForSelector (for CSS selector) and displayName (for text override)
+                    css += generateExtraStylingCSS(nameForSelector, false, settings, displayName);
+                }
+            } else {
+                css += `/* ${displayName} - No Banner, Show Avatar */\n`;
+                css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
+                css += `    display: flex !important;\n`;
+                css += `    visibility: visible !important;\n`;
+                css += `}\n\n`;
+            }
+        }
+        
+        // User messages CSS
+        if (anyCharacterHasBanner) {
+            css += `/* User Messages - Banner Mode */\n`;
+            css += `.mes[is_user="true"] .avatar {\n`;
+            css += `    display: none !important;\n`;
+            css += `}\n`;
+            
+            css += `.mes[is_user="true"] .ch_name,\n`;
+            css += `.mes[is_user="true"] .mes_block {\n`;
+            css += `    overflow: visible !important;\n`;
+            css += `}\n`;
+            
+            css += `.mes[is_user="true"] .ch_name > .flex-container > .flex-container.alignItemsBaseline {\n`;
+            css += `    flex-wrap: wrap !important;\n`;
+            css += `}\n`;
+            css += `.mes[is_user="true"] .ch_name .name_text {\n`;
+            css += `    flex-basis: 100% !important;\n`;
+            css += `}\n`;
+            
+            if (!settings.extraStylingEnabled) {
+                css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
+                css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                css += `}\n`;
+                css += `@media screen and (max-width: 768px) {\n`;
+                css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
+                css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
+                css += `    }\n`;
+                css += `}\n`;
+            } else {
+                css += generateExtraStylingCSS(null, true, settings);
+            }
+            css += `\n`;
+        }
+        
+        // Mobile responsive banner height
+        const mobileHeight = Math.round(settings.bannerHeight * 0.65);
+        css += `/* Mobile responsive banner height */\n`;
+        css += `@media screen and (max-width: 768px) {\n`;
+        css += `    .avatar-banner {\n`;
+        css += `        --banner-height: ${mobileHeight}px !important;\n`;
+        css += `        height: var(--banner-height) !important;\n`;
+        css += `    }\n`;
+        css += `}\n`;
+        
+        styleEl.textContent = css;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error updating dynamic CSS:', error);
+    }
+}
+
+/**
+ * Apply banners to all messages in the chat
+ */
+async function applyBannersToChat() {
+    try {
+        const settings = getSettings();
+        
+        await updateDynamicCSS();
+        
+        if (!settings.enabled) {
+            document.querySelectorAll('.avatar-banner').forEach(el => el.remove());
+            document.querySelectorAll('.mes').forEach(mes => {
+                mes.classList.remove('has-avatar-banner');
+            });
+            return;
+        }
+
+        const context = SillyTavern.getContext();
+        const messages = document.querySelectorAll('.mes');
+        const inGroupChat = isGroupChat();
+        
+        // Build cache of character banners and info
+        const bannerCache = new Map();
+        const characterInfoCache = new Map(); // Store {id, name, _originalName}
+        
+        if (inGroupChat) {
+            const group = getCurrentGroup();
+            if (group && group.members) {
+                for (const memberAvatar of group.members) {
+                    const charId = getCharacterIdByAvatar(memberAvatar);
+                    if (charId !== undefined && charId >= 0) {
+                        const character = context.characters[charId];
+                        if (character) {
+                            const banner = await getCharacterBanner(charId);
+                            const nameForLookup = character._originalName || character.name;
+                            
+                            bannerCache.set(nameForLookup, banner);
+                            characterInfoCache.set(nameForLookup, {
+                                id: charId,
+                                displayName: character.name,
+                                originalName: character._originalName || character.name
+                            });
+                            
+                            // Also cache by regular name if _originalName exists
+                            if (character._originalName) {
+                                bannerCache.set(character.name, banner);
+                                characterInfoCache.set(character.name, {
+                                    id: charId,
+                                    displayName: character.name,
+                                    originalName: character._originalName
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            const currentCharId = context.characterId;
+            if (currentCharId !== undefined) {
+                const character = context.characters?.[currentCharId];
+                if (character) {
+                    const banner = await getCharacterBanner(currentCharId);
+                    const nameForLookup = character._originalName || character.name;
+                    
+                    bannerCache.set(nameForLookup, banner);
+                    characterInfoCache.set(nameForLookup, {
+                        id: currentCharId,
+                        displayName: character.name,
+                        originalName: character._originalName || character.name
+                    });
+                    
+                    if (character._originalName) {
+                        bannerCache.set(character.name, banner);
+                        characterInfoCache.set(character.name, {
+                            id: currentCharId,
+                            displayName: character.name,
+                            originalName: character._originalName
                         });
                     }
                 }
             }
         }
-    } else {
-        // SINGLE CHARACTER CHAT: Process just the current character
-        const currentCharId = context.characterId;
-        if (currentCharId !== undefined) {
-            const character = context.characters?.[currentCharId];
-            if (character) {
-                css += `/* Avatar Banner - Single Chat: ${character.name} */\n\n`;
-                charactersToProcess.push({
-                    id: currentCharId,
-                    name: character.name,
-                    avatar: character.avatar
-                });
+        
+        const anyCharacterHasBanner = Array.from(bannerCache.values()).some(b => !!b);
+        
+        messages.forEach(mes => {
+            const existingBanner = mes.querySelector('.avatar-banner');
+            if (existingBanner) {
+                existingBanner.remove();
             }
-        }
-    }
-    
-    // Add Google Fonts import if font is specified and extra styling is enabled
-    // (We'll check if any character has banner below)
-    let fontImportAdded = false;
-    
-    // Process each character
-    for (const charInfo of charactersToProcess) {
-        const banner = await getCharacterBanner(charInfo.id);
-        const hasBanner = !!banner;
-        
-        if (hasBanner) {
-            anyCharacterHasBanner = true;
-            
-            // Add font import once if needed
-            if (!fontImportAdded && settings.extraStylingEnabled && settings.fontFamily) {
-                css += getGoogleFontImport(settings.fontFamily) + '\n\n';
-                fontImportAdded = true;
-            }
-        }
-        
-        const escapedName = escapeCSS(charInfo.name);
-        
-        if (hasBanner) {
-            // Character HAS banner - hide avatar
-            css += `/* ${charInfo.name} - Has Banner */\n`;
-            css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
-            css += `    display: none !important;\n`;
-            css += `}\n`;
-            
-            // Add padding only if extra styling is NOT enabled
-            if (!settings.extraStylingEnabled) {
-                css += `#chat .mes[ch_name="${escapedName}"] {\n`;
-                css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
-                css += `}\n`;
-                css += `@media screen and (max-width: 768px) {\n`;
-                css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
-                css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-                css += `    }\n`;
-                css += `}\n`;
-            }
-            css += `\n`;
-            
-            // Add extra styling for character if enabled
-            if (settings.extraStylingEnabled) {
-                css += generateExtraStylingCSS(charInfo.name, false, settings);
-            }
-        } else {
-            // Character does NOT have banner - force show avatar
-            css += `/* ${charInfo.name} - No Banner, Show Avatar */\n`;
-            css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
-            css += `    display: flex !important;\n`;
-            css += `    visibility: visible !important;\n`;
-            css += `}\n\n`;
-        }
-    }
-    
-    // CSS for user messages - when ANY character has a banner, user messages get styled for consistency
-    // The actual banner element only appears when setting is ON + user has a banner configured
-    if (anyCharacterHasBanner) {
-        css += `/* User Messages - Banner Mode (consistent with character styling) */\n`;
-        // Always hide user avatar when in banner mode
-        css += `.mes[is_user="true"] .avatar {\n`;
-        css += `    display: none !important;\n`;
-        css += `}\n`;
-        
-        // Prevent clipping for ALL user messages in banner mode (not just ones with banners)
-        css += `.mes[is_user="true"] .ch_name,\n`;
-        css += `.mes[is_user="true"] .mes_block {\n`;
-        css += `    overflow: visible !important;\n`;
-        css += `}\n`;
-        
-        // Name text wrapping for ALL user messages
-        css += `.mes[is_user="true"] .ch_name > .flex-container > .flex-container.alignItemsBaseline {\n`;
-        css += `    flex-wrap: wrap !important;\n`;
-        css += `}\n`;
-        css += `.mes[is_user="true"] .ch_name .name_text {\n`;
-        css += `    flex-basis: 100% !important;\n`;
-        css += `}\n`;
-        
-        if (!settings.extraStylingEnabled) {
-            // Padding only for messages WITH actual banners
-            css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
-            css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
-            css += `}\n`;
-            css += `@media screen and (max-width: 768px) {\n`;
-            css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
-            css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-            css += `    }\n`;
-            css += `}\n`;
-        } else {
-            // Extra styling (font styling applies to all, container styling only to .has-avatar-banner)
-            css += generateExtraStylingCSS(null, true, settings);
-        }
-        css += `\n`;
-    }
-    // When no character has a banner, user messages keep default styling (avatar shown, no extra padding)
-    
-    // Mobile responsive banner height
-    const mobileHeight = Math.round(settings.bannerHeight * 0.65);
-    css += `/* Mobile responsive banner height */\n`;
-    css += `@media screen and (max-width: 768px) {\n`;
-    css += `    .avatar-banner {\n`;
-    css += `        --banner-height: ${mobileHeight}px !important;\n`;
-    css += `        height: var(--banner-height) !important;\n`;
-    css += `    }\n`;
-    css += `}\n`;
-    
-    styleEl.textContent = css;
-}
 
-/**
- * Apply banners to all messages in the chat
- * Supports both single-character and group chats
- */
-async function applyBannersToChat() {
-    const settings = getSettings();
-    
-    // Update per-character CSS rules
-    await updateDynamicCSS();
-    
-    if (!settings.enabled) {
-        // Remove all banners and clean up
-        document.querySelectorAll('.avatar-banner').forEach(el => el.remove());
-        document.querySelectorAll('.mes').forEach(mes => {
-            mes.classList.remove('has-avatar-banner');
-        });
-        return;
-    }
-
-    const context = SillyTavern.getContext();
-    const messages = document.querySelectorAll('.mes');
-    const inGroupChat = isGroupChat();
-    
-    // Build a cache of character banners to avoid repeated lookups
-    // Maps character name -> banner data URL (or null)
-    const bannerCache = new Map();
-    
-    // Pre-populate cache for efficiency
-    if (inGroupChat) {
-        // GROUP CHAT: Cache banners for all group members
-        const group = getCurrentGroup();
-        if (group && group.members) {
-            for (const memberAvatar of group.members) {
-                const charId = getCharacterIdByAvatar(memberAvatar);
-                if (charId !== undefined && charId >= 0) {
-                    const character = context.characters[charId];
-                    if (character) {
-                        const banner = await getCharacterBanner(charId);
-                        bannerCache.set(character.name, banner);
-                    }
+            const isUser = mes.getAttribute('is_user') === 'true';
+            
+            if (isUser) {
+                if (!anyCharacterHasBanner) {
+                    mes.classList.remove('has-avatar-banner');
+                    return;
+                }
+                
+                if (!settings.enableUserBanners) {
+                    mes.classList.remove('has-avatar-banner');
+                    return;
                 }
             }
-        }
-    } else {
-        // SINGLE CHARACTER CHAT: Cache banner for current character
-        const currentCharId = context.characterId;
-        if (currentCharId !== undefined) {
-            const character = context.characters?.[currentCharId];
-            if (character) {
-                const banner = await getCharacterBanner(currentCharId);
-                bannerCache.set(character.name, banner);
-            }
-        }
-    }
-    
-    // Check if ANY character has a banner (determines user message styling)
-    const anyCharacterHasBanner = Array.from(bannerCache.values()).some(b => !!b);
-    
-    messages.forEach(mes => {
-        // Remove existing banner element
-        const existingBanner = mes.querySelector('.avatar-banner');
-        if (existingBanner) {
-            existingBanner.remove();
-        }
 
-        const isUser = mes.getAttribute('is_user') === 'true';
-        
-        // User messages:
-        // - CSS styling (hidden avatar, padding, font) applies when ANY char has banner
-        // - The actual banner IMAGE only appears when setting ON + user has banner configured
-        if (isUser) {
-            if (!anyCharacterHasBanner) {
-                // No characters have banners → normal mode, show avatar
-                mes.classList.remove('has-avatar-banner');
-                return;
-            }
-            
-            if (!settings.enableUserBanners) {
-                // User banners disabled → styling applies (via CSS), but no banner image
-                // IMPORTANT: Remove the class to prevent padding from applying
-                mes.classList.remove('has-avatar-banner');
-                return;
-            }
-        }
+            let bannerDataUrl = null;
 
-        let bannerDataUrl = null;
-
-        if (isUser) {
-            // Get user avatar for this message
-            const forceAvatar = mes.getAttribute('force_avatar');
-            let userAvatarPath;
-            if (forceAvatar && forceAvatar.startsWith('User Avatars/')) {
-                userAvatarPath = forceAvatar.replace('User Avatars/', '');
-            } else {
-                userAvatarPath = getCurrentUserAvatar();
-            }
-            
-            if (userAvatarPath) {
-                bannerDataUrl = getUserBanner(userAvatarPath);
-            }
-        } else {
-            // CHARACTER MESSAGE: Get banner for THIS specific character
-            const charName = mes.getAttribute('ch_name');
-            if (charName) {
-                // First check cache
-                if (bannerCache.has(charName)) {
-                    bannerDataUrl = bannerCache.get(charName);
+            if (isUser) {
+                const forceAvatar = mes.getAttribute('force_avatar');
+                let userAvatarPath;
+                if (forceAvatar && forceAvatar.startsWith('User Avatars/')) {
+                    userAvatarPath = forceAvatar.replace('User Avatars/', '');
                 } else {
-                    // Not in cache (shouldn't happen, but fallback)
-                    // This could happen if a character not in the group sent a message
-                    const charId = getCharacterIdByName(charName);
-                    if (charId !== undefined && charId >= 0) {
-                        // Note: This is sync access since we can't await in forEach
-                        // The banner should already be loaded on the character object
-                        const character = context.characters[charId];
-                        bannerDataUrl = character?.data?.extensions?.[extensionName]?.banner || null;
-                        bannerCache.set(charName, bannerDataUrl);
+                    userAvatarPath = getCurrentUserAvatar();
+                }
+                
+                if (userAvatarPath) {
+                    bannerDataUrl = getUserBanner(userAvatarPath);
+                }
+            } else {
+                const charName = mes.getAttribute('ch_name');
+                if (charName) {
+                    if (bannerCache.has(charName)) {
+                        bannerDataUrl = bannerCache.get(charName);
+                    } else {
+                        const charId = getCharacterIdByName(charName);
+                        if (charId !== undefined && charId >= 0) {
+                            const character = context.characters[charId];
+                            bannerDataUrl = character?.data?.extensions?.[extensionName]?.banner || null;
+                            bannerCache.set(charName, bannerDataUrl);
+                            
+                            // Also add to character info cache if not present
+                            if (!characterInfoCache.has(charName)) {
+                                characterInfoCache.set(charName, {
+                                    id: charId,
+                                    displayName: character.name,
+                                    originalName: character._originalName || character.name
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Replace displayed name if useDisplayName is enabled and extra styling is on
+                    if (settings.useDisplayName && settings.extraStylingEnabled && bannerDataUrl) {
+                        const charInfo = characterInfoCache.get(charName);
+                        if (charInfo && charInfo.displayName && charInfo.originalName !== charInfo.displayName) {
+                            const nameTextEl = mes.querySelector('.name_text');
+                            if (nameTextEl && nameTextEl.textContent.trim() === charInfo.originalName) {
+                                nameTextEl.textContent = charInfo.displayName;
+                            }
+                        }
+                    } else {
+                        // Restore original name if feature is disabled
+                        const charInfo = characterInfoCache.get(charName);
+                        if (charInfo && charInfo.displayName && charInfo.originalName !== charInfo.displayName) {
+                            const nameTextEl = mes.querySelector('.name_text');
+                            if (nameTextEl && nameTextEl.textContent.trim() === charInfo.displayName) {
+                                nameTextEl.textContent = charInfo.originalName;
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        if (bannerDataUrl) {
-            // Has banner - insert banner element and add class
-            const banner = createBannerElement(bannerDataUrl, settings.bannerHeight, mes);
-            
-            mes.style.position = 'relative';
-            mes.insertBefore(banner, mes.firstChild);
-            mes.classList.add('has-avatar-banner');
-        } else {
-            // No banner
-            mes.classList.remove('has-avatar-banner');
-        }
-    });
+            if (bannerDataUrl) {
+                const banner = createBannerElement(bannerDataUrl, settings.bannerHeight, mes);
+                mes.style.position = 'relative';
+                mes.insertBefore(banner, mes.firstChild);
+                mes.classList.add('has-avatar-banner');
+            } else {
+                mes.classList.remove('has-avatar-banner');
+            }
+        });
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error applying banners to chat:', error);
+    }
 }
 
 /**
- * Add button to character editor panel
+ * Add button to character editor panel (with proper cleanup tracking)
  */
 function addCharacterEditorButton() {
-    if (!window._avatarBannerCharClickBound) {
-        jQuery(document).on('click', '#avatar_banner_button', async function(e) {
+    // Setup event handler with cleanup tracking (once)
+    if (!ExtensionState.charClickHandlerBound) {
+        const handler = async function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            const context = SillyTavern.getContext();
-            const characterId = context.characterId;
-            const avatarPath = getCurrentCharacterAvatar();
-            const charName = context.characters?.[characterId]?.name || 'Character';
-            
-            if (avatarPath && characterId !== undefined) {
-                await handleBannerButtonClick(avatarPath, charName, false, characterId);
-            } else {
-                toastr.warning('No character avatar found');
+            try {
+                const context = SillyTavern.getContext();
+                const characterId = context.characterId;
+                const avatarPath = getCurrentCharacterAvatar();
+                const charName = context.characters?.[characterId]?.name || 'Character';
+                
+                if (avatarPath && characterId !== undefined) {
+                    await handleBannerButtonClick(avatarPath, charName, false, characterId);
+                } else {
+                    toastr.warning('No character avatar found');
+                }
+            } catch (error) {
+                console.error(`[${extensionName}]`, 'Error in character banner button:', error);
             }
+        };
+        
+        jQuery(document).on('click', '#avatar_banner_button', handler);
+        ExtensionState.charClickHandlerBound = true;
+        
+        // Track for cleanup
+        ExtensionState.cleanupFunctions.push(() => {
+            jQuery(document).off('click', '#avatar_banner_button', handler);
+            ExtensionState.charClickHandlerBound = false;
         });
-        window._avatarBannerCharClickBound = true;
     }
 
+    // Don't add button if it already exists
     if (document.getElementById('avatar_banner_button')) {
         return;
     }
@@ -994,26 +1142,40 @@ function addCharacterEditorButton() {
 }
 
 /**
- * Add button to persona panel
+ * Add button to persona panel (with proper cleanup tracking)
  */
 function addPersonaPanelButton() {
-    if (!window._avatarBannerPersonaClickBound) {
-        jQuery(document).on('click', '#persona_banner_button', async function(e) {
+    // Setup event handler with cleanup tracking (once)
+    if (!ExtensionState.personaClickHandlerBound) {
+        const handler = async function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            const userAvatar = user_avatar;
-            const userName = power_user.personas[user_avatar] || power_user.name || 'User';
-            
-            if (userAvatar && userAvatar !== 'none') {
-                await handleBannerButtonClick(userAvatar, userName, true);
-            } else {
-                toastr.warning('No persona avatar set');
+            try {
+                const userAvatar = user_avatar;
+                const userName = power_user.personas[userAvatar] || power_user.name || 'User';
+                
+                if (userAvatar && userAvatar !== 'none') {
+                    await handleBannerButtonClick(userAvatar, userName, true);
+                } else {
+                    toastr.warning('No persona avatar set');
+                }
+            } catch (error) {
+                console.error(`[${extensionName}]`, 'Error in persona banner button:', error);
             }
+        };
+        
+        jQuery(document).on('click', '#persona_banner_button', handler);
+        ExtensionState.personaClickHandlerBound = true;
+        
+        // Track for cleanup
+        ExtensionState.cleanupFunctions.push(() => {
+            jQuery(document).off('click', '#persona_banner_button', handler);
+            ExtensionState.personaClickHandlerBound = false;
         });
-        window._avatarBannerPersonaClickBound = true;
     }
 
+    // Don't add button if it already exists
     if (document.getElementById('persona_banner_button')) {
         return;
     }
@@ -1031,26 +1193,17 @@ function addPersonaPanelButton() {
     button.setAttribute('tabindex', '0');
     button.setAttribute('role', 'button');
 
-    // Find delete button - look for red button, trash icon, or button with "delete" in class/id
-    const deleteButton = buttonsBlock.querySelector('.red_button, .redWarningBG, [class*="delete"], .fa-trash, .fa-skull');
-    
+    const deleteButton = buttonsBlock.querySelector('#persona_delete_button');
     if (deleteButton) {
-        // Get the actual button element (might be the icon inside)
-        const targetButton = deleteButton.closest('.menu_button') || deleteButton;
-        buttonsBlock.insertBefore(button, targetButton);
+        buttonsBlock.insertBefore(button, deleteButton);
     } else {
-        // Fallback: insert before the last button
-        const allButtons = buttonsBlock.querySelectorAll('.menu_button');
-        if (allButtons.length > 0) {
-            buttonsBlock.insertBefore(button, allButtons[allButtons.length - 1]);
-        } else {
-            buttonsBlock.appendChild(button);
-        }
+        buttonsBlock.appendChild(button);
     }
 }
 
 /**
  * Create and inject the settings panel HTML
+ * (Keeping ALL your original styling features)
  */
 function createSettingsPanel() {
     const settings = getSettings();
@@ -1064,7 +1217,6 @@ function createSettingsPanel() {
                 <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
             </div>
             <div class="inline-drawer-content">
-                <!-- Row 1: Enable Avatar Banners | Enable Extra Styling -->
                 <div class="avatar-banner-grid-row">
                     <label class="checkbox_label flexnowrap" for="avatar_banner_enabled">
                         <input type="checkbox" id="avatar_banner_enabled" ${settings.enabled ? 'checked' : ''}>
@@ -1078,28 +1230,34 @@ function createSettingsPanel() {
                     </label>
                 </div>
                 
-                <!-- Row 2: Enable Persona Banners | Accent Color -->
                 <div class="avatar-banner-grid-row">
                     <label class="checkbox_label flexnowrap" for="avatar_banner_user_enabled">
                         <input type="checkbox" id="avatar_banner_user_enabled" ${settings.enableUserBanners ? 'checked' : ''}>
                         <span>Enable Persona Banners</span>
                         <div class="fa-solid fa-circle-info opacity50p" title="When enabled, persona messages will also show banners if configured."></div>
                     </label>
+                    <label class="checkbox_label flexnowrap ${disabledClass}" for="avatar_banner_use_display_name" id="avatar_banner_display_name_row">
+                        <input type="checkbox" id="avatar_banner_use_display_name" ${settings.useDisplayName ? 'checked' : ''}>
+                        <span>Use Display Name</span>
+                        <div class="fa-solid fa-circle-info opacity50p" title="Show short display name instead of full card name (e.g. 'Bo' instead of 'Bo ║ Teenage Dirtbag'). Only works with extra styling enabled."></div>
+                    </label>
+                </div>
+                
+                <div class="avatar-banner-grid-row">
                     <div class="avatar-banner-inline ${disabledClass}" id="avatar_banner_color_row">
                         <span>Accent Color</span>
                         <div class="fa-solid fa-circle-info opacity50p" title="Used for borders, shadows, gradients, and text effects"></div>
                         <toolcool-color-picker id="avatar_banner_color" color="${settings.accentColor || '#e79fa8'}"></toolcool-color-picker>
                     </div>
+                    <div style="min-height: 1px;"></div>
                 </div>
                 
-                <!-- Row 3: Font Family -->
                 <div class="avatar-banner-font-row ${disabledClass}" id="avatar_banner_font_row">
                     <span>Font Family</span>
                     <div class="fa-solid fa-circle-info opacity50p" title="Enter a font name (e.g. Caveat) or paste the full @import from Google Fonts for special fonts"></div>
                     <input type="text" id="avatar_banner_font" class="text_pole" placeholder="Font name or @import url(...)" value="${settings.fontFamily || ''}">
                 </div>
                 
-                <!-- Row 4: Two sliders side by side -->
                 <div class="avatar-banner-grid-row">
                     <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                         <small>
@@ -1119,7 +1277,6 @@ function createSettingsPanel() {
                     </div>
                 </div>
 
-                <!-- Row 5: Name padding controls (extra styling) -->
                 <div class="avatar-banner-grid-row ${disabledClass}" id="avatar_banner_namepadding_row">
                     <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                         <small>
@@ -1149,7 +1306,7 @@ function createSettingsPanel() {
         container.innerHTML = settingsHtml;
         extensionsSettings.appendChild(container);
 
-        // Enable/disable main feature
+        // Attach event listeners (ALL YOUR ORIGINAL FUNCTIONALITY)
         document.getElementById('avatar_banner_enabled').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.enabled = e.target.checked;
@@ -1157,7 +1314,6 @@ function createSettingsPanel() {
             applyBannersToChat();
         });
 
-        // Enable/disable persona banners
         document.getElementById('avatar_banner_user_enabled').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.enableUserBanners = e.target.checked;
@@ -1165,7 +1321,6 @@ function createSettingsPanel() {
             applyBannersToChat();
         });
 
-        // Banner height - synced slider and number input
         const heightSlider = document.getElementById('avatar_banner_height');
         const heightCounter = document.getElementById('avatar_banner_height_counter');
         
@@ -1186,7 +1341,6 @@ function createSettingsPanel() {
             updateBannerHeight(e.target.value);
         });
         
-        // Font size - synced slider and number input
         const fontSizeSlider = document.getElementById('avatar_banner_fontsize');
         const fontSizeCounter = document.getElementById('avatar_banner_fontsize_counter');
         
@@ -1207,7 +1361,6 @@ function createSettingsPanel() {
             updateFontSize(e.target.value);
         });
 
-        // Name padding - synced sliders and number inputs
         const namePadTbSlider = document.getElementById('avatar_banner_namepad_tb');
         const namePadTbCounter = document.getElementById('avatar_banner_namepad_tb_counter');
         const namePadLrSlider = document.getElementById('avatar_banner_namepad_lr');
@@ -1251,34 +1404,34 @@ function createSettingsPanel() {
             });
         }
         
-        // Enable/disable extra styling
         document.getElementById('avatar_banner_extra_styling').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.extraStylingEnabled = e.target.checked;
             saveSettings();
             
-            // Toggle disabled state for styling options
             const fontRow = document.getElementById('avatar_banner_font_row');
             const colorRow = document.getElementById('avatar_banner_color_row');
             const fontSizeRow = document.getElementById('avatar_banner_fontsize_row');
             const namePaddingRow = document.getElementById('avatar_banner_namepadding_row');
+            const displayNameRow = document.getElementById('avatar_banner_display_name_row');
             
             if (e.target.checked) {
                 fontRow.classList.remove('disabled');
                 colorRow.classList.remove('disabled');
                 fontSizeRow.classList.remove('disabled');
                 namePaddingRow?.classList.remove('disabled');
+                displayNameRow?.classList.remove('disabled');
             } else {
                 fontRow.classList.add('disabled');
                 colorRow.classList.add('disabled');
                 fontSizeRow.classList.add('disabled');
                 namePaddingRow?.classList.add('disabled');
+                displayNameRow?.classList.add('disabled');
             }
             
             applyBannersToChat();
         });
         
-        // Font family input
         document.getElementById('avatar_banner_font').addEventListener('input', (e) => {
             const settings = getSettings();
             settings.fontFamily = e.target.value.trim();
@@ -1286,12 +1439,17 @@ function createSettingsPanel() {
             applyBannersToChat();
         });
         
-        // Color picker (toolcool-color-picker)
+        document.getElementById('avatar_banner_use_display_name').addEventListener('change', (e) => {
+            const settings = getSettings();
+            settings.useDisplayName = e.target.checked;
+            saveSettings();
+            applyBannersToChat();
+        });
+        
         const colorPicker = document.getElementById('avatar_banner_color');
         if (colorPicker) {
             colorPicker.addEventListener('change', (e) => {
                 const settings = getSettings();
-                // toolcool-color-picker provides color in evt.detail.hex or evt.detail.rgba
                 const color = e.detail?.hex || colorPicker.color;
                 if (color) {
                     settings.accentColor = color;
@@ -1307,16 +1465,18 @@ function createSettingsPanel() {
  * Inject required CSS styles
  */
 function injectStyles() {
+    if (document.getElementById('avatar-banner-styles')) {
+        return;
+    }
+    
     const style = document.createElement('style');
     style.id = 'avatar-banner-styles';
     style.textContent = `
-        /* Only style messages that have banners - use class-based targeting */
         .mes.has-avatar-banner {
             position: relative;
             overflow: visible !important;
         }
         
-        /* Ensure message content is above banner and doesn't clip */
         .mes.has-avatar-banner .mes_block,
         .mes.has-avatar-banner .mes_text,
         .mes.has-avatar-banner .ch_name,
@@ -1325,14 +1485,11 @@ function injectStyles() {
             z-index: 2;
         }
         
-        /* Prevent clipping of decorative fonts */
         .mes.has-avatar-banner .ch_name,
         .mes.has-avatar-banner .mes_block {
             overflow: visible !important;
         }
         
-        /* Name text wrapping for CHARACTER messages with banners */
-        /* Forces two-line layout: name on line 1, timestamp+icons on line 2 */
         .mes.has-avatar-banner .ch_name > .flex-container > .flex-container.alignItemsBaseline {
             flex-wrap: wrap !important;
         }
@@ -1340,7 +1497,6 @@ function injectStyles() {
             flex-basis: 100% !important;
         }
         
-        /* Settings panel styling */
         .avatar-banner-settings .inline-drawer-content {
             display: flex;
             flex-direction: column;
@@ -1360,14 +1516,12 @@ function injectStyles() {
             margin: 0;
         }
         
-        /* Grid row for two columns */
         .avatar-banner-grid-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
         
-        /* Font family row - single row layout */
         .avatar-banner-font-row {
             display: flex;
             align-items: center;
@@ -1379,14 +1533,12 @@ function injectStyles() {
             margin: 0;
         }
         
-        /* Inline elements (label + info + control) */
         .avatar-banner-inline {
             display: flex;
             align-items: center;
             gap: 6px;
         }
         
-        /* Disabled state for styling options */
         .avatar-banner-inline.disabled,
         .avatar-banner-font-row.disabled,
         .avatar-banner-grid-row .disabled {
@@ -1407,66 +1559,209 @@ function injectStyles() {
 }
 
 /**
- * Initialize the extension
+ * Setup optimized MutationObserver for UI panels (with cleanup tracking)
  */
-function init() {
-    getSettings();
-    injectStyles();
-    createSettingsPanel();
-    
-    eventSource.on(event_types.CHAT_CHANGED, () => {
-        applyBannersToChat();
-        addCharacterEditorButton();
-    });
-    
-    eventSource.on(event_types.MESSAGE_RECEIVED, () => {
-        // Small delay to ensure DOM is fully updated with correct attributes
-        setTimeout(() => applyBannersToChat(), 100);
-    });
-    
-    eventSource.on(event_types.MESSAGE_SENT, () => {
-        // Small delay to ensure DOM is fully updated with correct attributes
-        setTimeout(() => applyBannersToChat(), 100);
-    });
-    
-    eventSource.on(event_types.CHARACTER_EDITED, () => {
-        addCharacterEditorButton();
-    });
-    
-    eventSource.on(event_types.SETTINGS_UPDATED, () => {
-        applyBannersToChat();
-    });
+function setupMutationObserver() {
+    if (ExtensionState.observer) {
+        return; // Already setup
+    }
     
     const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                const characterPopup = document.getElementById('character_popup');
-                if (characterPopup && characterPopup.style.display !== 'none') {
-                    addCharacterEditorButton();
-                }
-                
-                const personaDrawer = document.querySelector('#persona-management-button .drawer-content');
-                if (personaDrawer && personaDrawer.classList.contains('openDrawer')) {
-                    setTimeout(addPersonaPanelButton, 100);
+        try {
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                    const characterPopup = document.getElementById('character_popup');
+                    if (characterPopup && characterPopup.style.display !== 'none') {
+                        addCharacterEditorButton();
+                    }
+                    
+                    const personaDrawer = document.querySelector('#persona-management-button .drawer-content');
+                    if (personaDrawer && personaDrawer.classList.contains('openDrawer')) {
+                        requestAnimationFrame(() => addPersonaPanelButton());
+                    }
                 }
             }
+        } catch (error) {
+            console.error(`[${extensionName}]`, 'Error in MutationObserver:', error);
         }
     });
     
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class', 'style']
-    });
+    const observeTargets = () => {
+        const characterPopup = document.getElementById('character_popup');
+        const personaButton = document.getElementById('persona-management-button');
+        
+        if (characterPopup) {
+            observer.observe(characterPopup, {
+                childList: true,
+                attributes: true,
+                attributeFilter: ['style'],
+                subtree: false // OPTIMIZED: Don't watch deep tree
+            });
+        }
+        
+        if (personaButton) {
+            observer.observe(personaButton, {
+                childList: true,
+                attributes: true,
+                attributeFilter: ['class'],
+                subtree: true
+            });
+        }
+    };
     
-    setTimeout(() => {
-        applyBannersToChat();
-        addCharacterEditorButton();
-        addPersonaPanelButton();
-    }, 1000);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', observeTargets);
+    } else {
+        observeTargets();
+    }
+    
+    ExtensionState.observer = observer;
+    
+    // Track for cleanup
+    ExtensionState.cleanupFunctions.push(() => {
+        if (ExtensionState.observer) {
+            ExtensionState.observer.disconnect();
+            ExtensionState.observer = null;
+        }
+    });
 }
 
+/**
+ * Cleanup function for proper resource management
+ * PREVENTS MEMORY LEAKS
+ */
+function cleanup() {
+    console.log(`[${extensionName}]`, 'Cleaning up resources...');
+    
+    // Execute all cleanup functions
+    ExtensionState.cleanupFunctions.forEach(fn => {
+        try {
+            fn();
+        } catch (error) {
+            console.error(`[${extensionName}]`, 'Error during cleanup:', error);
+        }
+    });
+    
+    ExtensionState.cleanupFunctions = [];
+    
+    // Remove dynamic styles
+    if (dynamicStyleElement) {
+        dynamicStyleElement.remove();
+        dynamicStyleElement = null;
+    }
+    
+    // Remove static styles
+    const staticStyles = document.getElementById('avatar-banner-styles');
+    if (staticStyles) {
+        staticStyles.remove();
+    }
+    
+    // Font preload/link elements are already tracked in cleanupFunctions above
+    
+    // Remove all banners from DOM
+    document.querySelectorAll('.avatar-banner').forEach(el => el.remove());
+    document.querySelectorAll('.mes').forEach(mes => {
+        mes.classList.remove('has-avatar-banner');
+    });
+    
+    // Remove buttons
+    const charButton = document.getElementById('avatar_banner_button');
+    if (charButton) charButton.remove();
+    
+    const personaButton = document.getElementById('persona_banner_button');
+    if (personaButton) personaButton.remove();
+    
+    ExtensionState.initialized = false;
+    
+    console.log(`[${extensionName}]`, 'Cleanup complete');
+}
+
+/**
+ * Initialize the extension
+ */
+function init() {
+    if (ExtensionState.initialized) {
+        console.log(`[${extensionName}]`, 'Already initialized, skipping');
+        return;
+    }
+    
+    try {
+        console.log(`[${extensionName}]`, 'Initializing v3.1.0...');
+        
+        // Initialize settings and UI
+        getSettings();
+        injectStyles();
+        createSettingsPanel();
+        
+        // Register event handlers with cleanup tracking
+        const chatChangedHandler = () => {
+            applyBannersToChat();
+            addCharacterEditorButton();
+        };
+        eventSource.on(event_types.CHAT_CHANGED, chatChangedHandler);
+        ExtensionState.cleanupFunctions.push(() => {
+            eventSource.removeListener(event_types.CHAT_CHANGED, chatChangedHandler);
+        });
+        
+        const messageReceivedHandler = () => {
+            requestAnimationFrame(() => applyBannersToChat());
+        };
+        eventSource.on(event_types.MESSAGE_RECEIVED, messageReceivedHandler);
+        ExtensionState.cleanupFunctions.push(() => {
+            eventSource.removeListener(event_types.MESSAGE_RECEIVED, messageReceivedHandler);
+        });
+        
+        const messageSentHandler = () => {
+            requestAnimationFrame(() => applyBannersToChat());
+        };
+        eventSource.on(event_types.MESSAGE_SENT, messageSentHandler);
+        ExtensionState.cleanupFunctions.push(() => {
+            eventSource.removeListener(event_types.MESSAGE_SENT, messageSentHandler);
+        });
+        
+        const characterEditedHandler = () => {
+            addCharacterEditorButton();
+        };
+        eventSource.on(event_types.CHARACTER_EDITED, characterEditedHandler);
+        ExtensionState.cleanupFunctions.push(() => {
+            eventSource.removeListener(event_types.CHARACTER_EDITED, characterEditedHandler);
+        });
+        
+        const settingsUpdatedHandler = () => {
+            applyBannersToChat();
+        };
+        eventSource.on(event_types.SETTINGS_UPDATED, settingsUpdatedHandler);
+        ExtensionState.cleanupFunctions.push(() => {
+            eventSource.removeListener(event_types.SETTINGS_UPDATED, settingsUpdatedHandler);
+        });
+        
+        // Setup optimized MutationObserver
+        setupMutationObserver();
+        
+        // Initial application
+        setTimeout(() => {
+            applyBannersToChat();
+            addCharacterEditorButton();
+            addPersonaPanelButton();
+        }, 1000);
+        
+        ExtensionState.initialized = true;
+        console.log(`[${extensionName}]`, 'Initialization complete');
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error during initialization:', error);
+    }
+}
+
+// jQuery ready - standard ST extension pattern
 jQuery(() => {
     init();
 });
+
+// Export cleanup for extension system
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { cleanup };
+}
+
+// Make cleanup available globally for manual cleanup if needed
+window.AvatarBannerExtension = window.AvatarBannerExtension || {};
+window.AvatarBannerExtension.cleanup = cleanup;
