@@ -5,10 +5,10 @@
  * Stores banners PER-CHARACTER in character card data using writeExtensionField
  * User/persona banners stored in extension_settings
  * 
- * @version 3.2.4
+ * @version 3.3.0
  * @compatibility Works with chat-name extension (uses _originalName for CSS selectors)
  * @feature Optional display name override for cleaner styled names (uses JS text replacement for mobile compatibility)
- * @fix Group chat font styling - aggressive CSS specificity and forced font loading with cache busting
+ * @fix Font flickering - only reloads font when user changes it, not on every chat change
  * @compliance Full production compliance - memory leak prevention, proper cleanup tracking, error handling
  */
 
@@ -25,6 +25,7 @@ const ExtensionState = {
     cleanupFunctions: [],
     observer: null,
     initialized: false,
+    currentLoadedFont: null, // Track currently loaded font to prevent flickering on chat changes
 };
 
 // Default settings (global settings only - banners stored per-character)
@@ -493,28 +494,24 @@ function parseFontInput(input) {
 }
 
 /**
- * Get Google Fonts import statement from user input with cache busting
+ * Get Google Fonts import statement from user input
+ * Cache busting removed - handled by link elements for smoother loading
  */
 function getGoogleFontImport(input) {
     const parsed = parseFontInput(input);
     if (!parsed.importStatement) return '';
     
-    // Extract URL from @import statement
-    const urlMatch = parsed.importStatement.match(/url\(['"]?([^'"]+)['"]?\)/);
-    if (!urlMatch) return parsed.importStatement;
-    
-    const fontUrl = urlMatch[1];
-    // Add cache buster timestamp
-    const cacheBustedUrl = fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
-    
-    return `@import url('${cacheBustedUrl}');`;
+    // Return original @import without cache busting
+    // The link elements handle cache busting when needed
+    return parsed.importStatement;
 }
 
 /**
  * Force load Google Font by injecting link element (more reliable than @import)
  * Properly tracked for cleanup to prevent memory leaks
+ * Only reloads if font actually changed to prevent flickering
  */
-function preloadGoogleFont(input) {
+function preloadGoogleFont(input, forceReload = false) {
     const parsed = parseFontInput(input);
     if (!parsed.importStatement) return;
     
@@ -522,6 +519,14 @@ function preloadGoogleFont(input) {
     if (!urlMatch) return;
     
     const fontUrl = urlMatch[1];
+    
+    // Check if this font is already loaded (prevent flickering on chat changes)
+    if (!forceReload && ExtensionState.currentLoadedFont === fontUrl) {
+        return; // Font already loaded, skip reload
+    }
+    
+    // Mark this font as loaded
+    ExtensionState.currentLoadedFont = fontUrl;
     
     // Remove old preload if exists (cleanup old elements)
     const oldPreload = document.getElementById('avatar-banner-font-preload');
@@ -532,7 +537,10 @@ function preloadGoogleFont(input) {
     preload.id = 'avatar-banner-font-preload';
     preload.rel = 'preload';
     preload.as = 'style';
-    preload.href = fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
+    // Only use cache buster when force reloading (user changed font)
+    preload.href = forceReload ? 
+        fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}` :
+        fontUrl;
     
     // Track for cleanup (CRITICAL for memory management)
     ExtensionState.cleanupFunctions.push(() => {
@@ -549,7 +557,10 @@ function preloadGoogleFont(input) {
     const link = document.createElement('link');
     link.id = 'avatar-banner-font-link';
     link.rel = 'stylesheet';
-    link.href = fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}`;
+    // Only use cache buster when force reloading (user changed font)
+    link.href = forceReload ? 
+        fontUrl + (fontUrl.includes('?') ? '&' : '?') + `_cb=${Date.now()}` :
+        fontUrl;
     
     // Track for cleanup (CRITICAL for memory management)
     ExtensionState.cleanupFunctions.push(() => {
@@ -1434,9 +1445,20 @@ function createSettingsPanel() {
         
         document.getElementById('avatar_banner_font').addEventListener('input', (e) => {
             const settings = getSettings();
-            settings.fontFamily = e.target.value.trim();
-            saveSettings();
-            applyBannersToChat();
+            const newFont = e.target.value.trim();
+            
+            // Only force reload if font actually changed
+            if (settings.fontFamily !== newFont) {
+                settings.fontFamily = newFont;
+                saveSettings();
+                
+                // Force reload font with cache busting
+                if (settings.extraStylingEnabled && newFont) {
+                    preloadGoogleFont(newFont, true); // forceReload = true
+                }
+                
+                applyBannersToChat();
+            }
         });
         
         document.getElementById('avatar_banner_use_display_name').addEventListener('change', (e) => {
@@ -1643,6 +1665,9 @@ function cleanup() {
     });
     
     ExtensionState.cleanupFunctions = [];
+    
+    // Reset loaded font state
+    ExtensionState.currentLoadedFont = null;
     
     // Remove dynamic styles
     if (dynamicStyleElement) {
