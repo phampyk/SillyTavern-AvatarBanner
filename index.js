@@ -5,8 +5,9 @@
  * Stores banners PER-CHARACTER in character card data using writeExtensionField
  * User/persona banners stored in extension_settings
  * 
- * @version 3.3.0
- * @compatibility Works with chat-name extension (uses _originalName for CSS selectors)
+ * @version 3.3.2
+ * @hotfix Fixed compatibility with new chat-name extension v1.0.0
+ * @compatibility Works with chat-name extension (reads from character.data.extensions['chat-name'].chatName)
  * @feature Optional display name override for cleaner styled names (uses JS text replacement for mobile compatibility)
  * @fix Font flickering - only reloads font when user changes it, not on every chat change
  * @compliance Full production compliance - memory leak prevention, proper cleanup tracking, error handling
@@ -16,7 +17,7 @@ import { eventSource, event_types, saveSettingsDebounced } from '../../../../scr
 import { extension_settings } from '../../../extensions.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
-import { callGenericPopup, POPUP_TYPE } from '../../../popup.js';
+import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../popup.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
@@ -255,11 +256,11 @@ async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
             { okButton: 'Edit', cancelButton: 'Remove' }
         );
         
-        if (result) {
-            // Edit
+        if (result === POPUP_RESULT.AFFIRMATIVE) {
+            // Edit (OK button clicked)
             await onEdit();
-        } else if (result === false) {
-            // Remove - confirm first
+        } else if (result === POPUP_RESULT.NEGATIVE) {
+            // Remove (Cancel button clicked) - confirm first
             const confirmResult = await callGenericPopup(
                 '<p>Are you sure you want to remove this banner?</p>',
                 POPUP_TYPE.CONFIRM,
@@ -267,10 +268,11 @@ async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
                 { okButton: 'Yes, Remove', cancelButton: 'Cancel' }
             );
             
-            if (confirmResult) {
+            if (confirmResult === POPUP_RESULT.AFFIRMATIVE) {
                 await onDelete();
             }
         }
+        // If result === POPUP_RESULT.CANCELLED (null), user closed popup - do nothing
     } catch (error) {
         console.error(`[${extensionName}]`, 'Error showing banner options popup:', error);
         toastr.error('Error showing options');
@@ -805,16 +807,23 @@ async function updateDynamicCSS() {
                 }
             }
             
-            // CRITICAL: Get character from context to check for _originalName
+            // CRITICAL: Get character from context to check for chat-name extension
             const character = context.characters[charInfo.id];
             
-            // For CSS selector: Use _originalName if it exists (matches DOM ch_name attribute)
-            // The DOM ch_name is set from the CHARACTER CARD NAME, not the display name
+            // For CSS selector: Use _originalName (card name) if it exists (matches DOM ch_name attribute)
+            // The DOM ch_name is ALWAYS set from the card name, never the chat name
             const nameForSelector = character?._originalName || character?.name || charInfo.name;
             const escapedName = escapeCSS(nameForSelector);
             
-            // For display: Use character.name (the display name from CharacterName extension)
-            const displayName = character?.name || charInfo.name;
+            // For display: Get chat name from extension data if available
+            // The new chat-name extension stores: character.data.extensions['chat-name'].chatName
+            let displayName = character?.name || charInfo.name;
+            if (character?.data?.extensions?.['chat-name']?.chatName) {
+                const chatName = character.data.extensions['chat-name'].chatName.trim();
+                if (chatName) {
+                    displayName = chatName;
+                }
+            }
             
             // Debug logging for group chats (wrapped for safety)
             if (inGroupChat && hasBanner) {
@@ -948,10 +957,19 @@ async function applyBannersToChat() {
                             const banner = await getCharacterBanner(charId);
                             const nameForLookup = character._originalName || character.name;
                             
+                            // Get display name from chat-name extension or use character.name
+                            let displayName = character.name;
+                            if (character.data?.extensions?.['chat-name']?.chatName) {
+                                const chatName = character.data.extensions['chat-name'].chatName.trim();
+                                if (chatName) {
+                                    displayName = chatName;
+                                }
+                            }
+                            
                             bannerCache.set(nameForLookup, banner);
                             characterInfoCache.set(nameForLookup, {
                                 id: charId,
-                                displayName: character.name,
+                                displayName: displayName,
                                 originalName: character._originalName || character.name
                             });
                             
@@ -960,7 +978,7 @@ async function applyBannersToChat() {
                                 bannerCache.set(character.name, banner);
                                 characterInfoCache.set(character.name, {
                                     id: charId,
-                                    displayName: character.name,
+                                    displayName: displayName,
                                     originalName: character._originalName
                                 });
                             }
@@ -976,9 +994,21 @@ async function applyBannersToChat() {
                     const banner = await getCharacterBanner(currentCharId);
                     const nameForLookup = character._originalName || character.name;
                     
+                    // Get display name from chat-name extension or use character.name
+                    let displayName = character.name;
+                    if (character.data?.extensions?.['chat-name']?.chatName) {
+                        const chatName = character.data.extensions['chat-name'].chatName.trim();
+                        if (chatName) {
+                            displayName = chatName;
+                        }
+                    }
+                    
                     bannerCache.set(nameForLookup, banner);
                     characterInfoCache.set(nameForLookup, {
                         id: currentCharId,
+                        displayName: displayName,
+                        originalName: character._originalName || character.name
+                    });
                         displayName: character.name,
                         originalName: character._originalName || character.name
                     });
@@ -987,7 +1017,7 @@ async function applyBannersToChat() {
                         bannerCache.set(character.name, banner);
                         characterInfoCache.set(character.name, {
                             id: currentCharId,
-                            displayName: character.name,
+                            displayName: displayName,
                             originalName: character._originalName
                         });
                     }
