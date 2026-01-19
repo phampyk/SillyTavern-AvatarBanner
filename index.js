@@ -5,8 +5,8 @@
  * Stores banners PER-CHARACTER in character card data using writeExtensionField
  * User/persona banners stored in extension_settings
  * 
- * @version 3.3.2
- * @hotfix Fixed compatibility with new chat-name extension v1.0.0
+ * @version 3.3.3
+ * @hotfix CRITICAL: Reverted ALL popup code to working v3.1.0 pattern (new Popup() not callGenericPopup)
  * @compatibility Works with chat-name extension (reads from character.data.extensions['chat-name'].chatName)
  * @feature Optional display name override for cleaner styled names (uses JS text replacement for mobile compatibility)
  * @fix Font flickering - only reloads font when user changes it, not on every chat change
@@ -17,7 +17,6 @@ import { eventSource, event_types, saveSettingsDebounced } from '../../../../scr
 import { extension_settings } from '../../../extensions.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
-import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../popup.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
@@ -245,37 +244,53 @@ function removeUserBanner(avatarPath) {
 }
 
 /**
- * Show popup with options to Edit or Delete banner using ST's native popup API
+ * Show popup with options to Edit or Delete banner
  */
 async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
-    try {
-        const result = await callGenericPopup(
-            `<p>A banner is already configured for <b>${displayName}</b>.</p><p>What would you like to do?</p>`,
+    const context = SillyTavern.getContext();
+    const { Popup, POPUP_TYPE } = context;
+    
+    if (!Popup || !POPUP_TYPE) {
+        // Fallback: just open editor
+        onEdit();
+        return;
+    }
+    
+    // Use a simple confirm popup first asking if they want to remove
+    const removeConfirm = new Popup(
+        `Banner exists for ${displayName}`,
+        POPUP_TYPE.CONFIRM,
+        `<div style="text-align: center;">
+            <p>A banner is already configured.</p>
+            <p><b>Remove</b> the banner, or <b>Edit</b> it?</p>
+        </div>`,
+        {
+            okButton: 'Edit',
+            cancelButton: 'Remove',
+        }
+    );
+    
+    const result = await removeConfirm.show();
+    
+    // result is true for OK (Edit), false/0 for Cancel (Remove)
+    if (result === true || result === 1) {
+        onEdit();
+    } else if (result === false || result === 0) {
+        // Confirm deletion
+        const deleteConfirm = new Popup(
+            'Confirm Removal',
             POPUP_TYPE.CONFIRM,
-            '',
-            { okButton: 'Edit', cancelButton: 'Remove' }
+            '<p>Are you sure you want to remove this banner?</p>',
+            {
+                okButton: 'Yes, Remove',
+                cancelButton: 'Cancel',
+            }
         );
         
-        if (result === POPUP_RESULT.AFFIRMATIVE) {
-            // Edit (OK button clicked)
-            await onEdit();
-        } else if (result === POPUP_RESULT.NEGATIVE) {
-            // Remove (Cancel button clicked) - confirm first
-            const confirmResult = await callGenericPopup(
-                '<p>Are you sure you want to remove this banner?</p>',
-                POPUP_TYPE.CONFIRM,
-                '',
-                { okButton: 'Yes, Remove', cancelButton: 'Cancel' }
-            );
-            
-            if (confirmResult === POPUP_RESULT.AFFIRMATIVE) {
-                await onDelete();
-            }
+        const confirmResult = await deleteConfirm.show();
+        if (confirmResult === true || confirmResult === 1) {
+            onDelete();
         }
-        // If result === POPUP_RESULT.CANCELLED (null), user closed popup - do nothing
-    } catch (error) {
-        console.error(`[${extensionName}]`, 'Error showing banner options popup:', error);
-        toastr.error('Error showing options');
     }
 }
 
@@ -288,18 +303,24 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
         return;
     }
 
+    const context = SillyTavern.getContext();
+    const { Popup, POPUP_TYPE } = context;
+
+    if (!Popup || !POPUP_TYPE) {
+        toastr.error('Popup API not available');
+        return;
+    }
+
+    let avatarUrl;
+    if (isUser) {
+        avatarUrl = getPersonaImageUrlFullRes(avatarPath);
+    } else {
+        avatarUrl = `/characters/${avatarPath}`;
+    }
+
     try {
-        // Construct avatar URL
-        let avatarUrl;
-        if (isUser) {
-            avatarUrl = getPersonaImageUrlFullRes(avatarPath);
-        } else {
-            avatarUrl = `/characters/${avatarPath}`;
-        }
-
         console.log(`[${extensionName}]`, 'Loading avatar from:', avatarUrl);
-
-        // Fetch and convert to base64
+        
         const response = await fetch(avatarUrl);
         if (!response.ok) {
             throw new Error(`Failed to load avatar: ${response.status}`);
@@ -314,24 +335,25 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
 
         console.log(`[${extensionName}]`, 'Avatar loaded, opening crop editor');
 
-        // Use ST's native POPUP_TYPE.CROP API (from popup.js line 358-376, 576-581)
-        const croppedDataUrl = await callGenericPopup(
+        const popup = new Popup(
             `Configure banner for ${displayName}`,
             POPUP_TYPE.CROP,
-            dataUrl,
+            '',
             {
-                cropAspect: 4, // 4:1 aspect ratio for wide banners
                 cropImage: dataUrl,
+                cropAspect: 4,
                 okButton: 'Save Banner',
                 cancelButton: 'Cancel',
             }
         );
 
-        if (croppedDataUrl && typeof croppedDataUrl === 'string' && croppedDataUrl.startsWith('data:')) {
+        const result = await popup.show();
+
+        if (result && typeof result === 'string' && result.startsWith('data:')) {
             if (isUser) {
-                saveUserBanner(avatarPath, croppedDataUrl);
+                saveUserBanner(avatarPath, result);
             } else {
-                await saveCharacterBanner(characterId, croppedDataUrl);
+                await saveCharacterBanner(characterId, result);
             }
             
             applyBannersToChat();
@@ -1007,9 +1029,6 @@ async function applyBannersToChat() {
                     characterInfoCache.set(nameForLookup, {
                         id: currentCharId,
                         displayName: displayName,
-                        originalName: character._originalName || character.name
-                    });
-                        displayName: character.name,
                         originalName: character._originalName || character.name
                     });
                     
