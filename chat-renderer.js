@@ -187,7 +187,7 @@ export async function updateDynamicCSS() {
             css += `/* User Messages - Banner/Styling Mode */\n`;
             
             if (isMoonlit) {
-                // Moonlit User Message Styling - Only if banners are enabled
+                // Moonlit User Message Styling
                 if (settings.enableUserBanners) {
                      css += `#chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
                      css += `    padding-top: ${paddingTop}px !important;\n`;
@@ -197,10 +197,11 @@ export async function updateDynamicCSS() {
                      css += `        padding-top: ${paddingTopMobile}px !important;\n`;
                      css += `    }\n`;
                      css += `}\n`;
-                     
-                     if (settings.extraStylingEnabled) {
-                         css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
-                     }
+                }
+                
+                // For Moonlit Persona: styling persists if Extra Styling is on
+                if (settings.extraStylingEnabled) {
+                    css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
                 }
             } else {
                 // Standard mode structural overrides - ONLY if banner is enabled
@@ -386,6 +387,9 @@ export async function applyBannersToChat() {
             const isUser = mes.getAttribute('is_user') === 'true';
             
             if (isUser) {
+                // Remove existing Moonlit classes first
+                mes.classList.remove('moonlit-banner');
+
                 if (!anyCharacterHasBanner) {
                     mes.classList.remove('has-avatar-banner');
                     return;
@@ -393,7 +397,24 @@ export async function applyBannersToChat() {
                 
                 if (!settings.enableUserBanners) {
                     mes.classList.remove('has-avatar-banner');
-                    return;
+                    
+                    // If styling is on, keep the moonlit-banner class for CSS targeting
+                    if (settings.moonlitCompatibility && settings.extraStylingEnabled) {
+                        mes.classList.add('moonlit-banner');
+                    } else {
+                        return;
+                    }
+                } else {
+                    // Persona Banners are enabled - we'll add classes properly during injection if banner exists,
+                    // or here if we want persistent styling even without an image.
+                    if (settings.moonlitCompatibility && settings.extraStylingEnabled) {
+                        mes.classList.add('moonlit-banner');
+                    }
+                }
+            } else {
+                // Character message classes reset
+                if (settings.moonlitCompatibility) {
+                    mes.classList.remove('moonlit-banner');
                 }
             }
             
