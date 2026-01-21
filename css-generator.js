@@ -198,9 +198,15 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
         css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
         css += `}\n\n`;
 
-        // Hide avatar in Moonlit mode when banner is active
-        css += `#chat ${selector}.moonlit-banner .avatar {\n`;
+        // Hide avatar in Moonlit mode when banner is active or styling is on
+        css += `html body #chat .mes${selector}.moonlit-banner .avatar,\n`;
+        css += `#chat .mes${selector}.moonlit-banner .avatar {\n`;
         css += `    display: none !important;\n`;
+        css += `    visibility: hidden !important;\n`;
+        css += `    opacity: 0 !important;\n`;
+        css += `    width: 0 !important;\n`;
+        css += `    height: 0 !important;\n`;
+        css += `    margin: 0 !important;\n`;
         css += `}\n\n`;
     }
 

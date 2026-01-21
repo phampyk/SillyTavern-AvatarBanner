@@ -189,10 +189,12 @@ export async function updateDynamicCSS() {
             if (isMoonlit) {
                 // Moonlit User Message Styling
                 if (settings.enableUserBanners) {
+                     css += `html body #chat .mes[is_user="true"].moonlit-banner .mes_block,\n`;
                      css += `#chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
                      css += `    padding-top: ${paddingTop}px !important;\n`;
                      css += `}\n`;
                      css += `@media screen and (max-width: 768px) {\n`;
+                     css += `    html body #chat .mes[is_user="true"].moonlit-banner .mes_block,\n`;
                      css += `    #chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
                      css += `        padding-top: ${paddingTopMobile}px !important;\n`;
                      css += `    }\n`;
