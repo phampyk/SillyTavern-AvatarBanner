@@ -402,7 +402,7 @@ export async function applyBannersToChat() {
                     if (settings.moonlitCompatibility && settings.extraStylingEnabled) {
                         mes.classList.add('moonlit-banner');
                     } else {
-                        return;
+                        return; // No banner and no styling = absolute skip
                     }
                 } else {
                     // Persona Banners are enabled - we'll add classes properly during injection if banner exists,
@@ -412,6 +412,9 @@ export async function applyBannersToChat() {
                     }
                 }
             } else {
+                if (!anyCharacterHasBanner) {
+                    return;
+                }
                 // Character message classes reset
                 if (settings.moonlitCompatibility) {
                     mes.classList.remove('moonlit-banner');
