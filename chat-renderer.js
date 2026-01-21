@@ -388,28 +388,26 @@ export async function applyBannersToChat() {
             
             if (isUser) {
                 // Remove existing Moonlit classes first
-                mes.classList.remove('moonlit-banner');
+                mes.classList.remove('moonlit-banner', 'has-avatar-banner');
 
                 if (!anyCharacterHasBanner) {
-                    mes.classList.remove('has-avatar-banner');
                     return;
                 }
                 
-                if (!settings.enableUserBanners) {
-                    mes.classList.remove('has-avatar-banner');
-                    
-                    // If styling is on, keep the moonlit-banner class for CSS targeting
-                    if (settings.moonlitCompatibility && settings.extraStylingEnabled) {
-                        mes.classList.add('moonlit-banner');
-                    } else {
-                        return; // No banner and no styling = absolute skip
-                    }
-                } else {
-                    // Persona Banners are enabled - we'll add classes properly during injection if banner exists,
-                    // or here if we want persistent styling even without an image.
-                    if (settings.moonlitCompatibility && settings.extraStylingEnabled) {
+                // If either banners or extra styling is enabled, we need the structural classes
+                if (settings.enableUserBanners || settings.extraStylingEnabled) {
+                    mes.classList.add('has-avatar-banner');
+                    if (settings.moonlitCompatibility) {
                         mes.classList.add('moonlit-banner');
                     }
+                }
+
+                // If persona banners are disabled but extra styling is on, we skip injection but kept classes
+                if (!settings.enableUserBanners && !settings.extraStylingEnabled) {
+                     mes.classList.remove('has-avatar-banner', 'moonlit-banner');
+                     return;
+                } else if (!settings.enableUserBanners) {
+                     // Keep classes for CSS but skip image injection logic
                 }
             } else {
                 if (!anyCharacterHasBanner) {

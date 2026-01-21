@@ -31,6 +31,7 @@ export function getDynamicStyleElement() {
  */
 export function generateExtraStylingCSS(characterName, isUser, settings, displayName = null, isMoonlit = false) {
     const rgb = hexToRgb(settings.accentColor);
+    const blurTintVar = isUser ? '--SmartThemeUserMesBlurTintColor' : '--SmartThemeBotMesBlurTintColor';
     const paddingTop = Math.max(settings.bannerHeight - 30, 50);
     const paddingTopMobile = Math.max(Math.round(settings.bannerHeight * 0.45 - 23), 20);
     const parsedFontName = getFontFamilyName(settings.fontFamily);
@@ -125,7 +126,7 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
     css += `}\n\n`;
     
     // Message container styling
-    const blurTintVar = isUser ? '--SmartThemeUserMesBlurTintColor' : '--SmartThemeBotMesBlurTintColor';
+    // Style applied logic follows...
     
     // SKIP container styling if Moonlit Echoes mode is active
     // The theme handles structure, and we inject into .mes_block, so we shouldn't style the parent .mes
