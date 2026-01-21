@@ -528,7 +528,14 @@ export async function applyBannersToChat() {
                     mes.classList.add('has-avatar-banner');
                 }
             } else {
-                mes.classList.remove('has-avatar-banner', 'moonlit-banner');
+                // IMPORTANT: Only remove classes if we are NOT in a styling-persistence case
+                // For Moonlit Persona: Persistent if extraStylingEnabled is true (and anyCharacterHasBanner checked above)
+                const isMoonlit = settings.moonlitCompatibility;
+                const persistStyling = isUser && isMoonlit && settings.extraStylingEnabled;
+                
+                if (!persistStyling) {
+                    mes.classList.remove('has-avatar-banner', 'moonlit-banner');
+                }
             }
         });
 

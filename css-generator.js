@@ -190,7 +190,11 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
         css += `}\n\n`;
     } else {
         // Moonlit Echoes Mode: Dynamic Styling for .mes_block
-        css += `#chat ${selector}.moonlit-banner .mes_block {\n`;
+        // Use high specificity to ensure we override theme backgrounds/borders
+        const moonlitSelector = `#chat .mes${selector}.moonlit-banner .mes_block`;
+        
+        css += `html body ${moonlitSelector},\n`;
+        css += `${moonlitSelector} {\n`;
         css += `    background:\n`;
         css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
         css += `        var(${blurTintVar});\n`;
@@ -198,7 +202,7 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
         css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
         css += `}\n\n`;
 
-        // Hide avatar in Moonlit mode when banner is active or styling is on
+        // Hide avatar in Moonlit mode when banner or styling is on
         css += `html body #chat .mes${selector}.moonlit-banner .avatar,\n`;
         css += `#chat .mes${selector}.moonlit-banner .avatar {\n`;
         css += `    display: none !important;\n`;
