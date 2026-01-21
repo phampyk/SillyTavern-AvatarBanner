@@ -154,28 +154,13 @@ export async function updateDynamicCSS() {
                         css += `    display: none !important;\n`;
                         css += `}\n`;
                         
-                        // Structural padding logic - Centralized here and gated by banner presence
-                        css += `#chat .mes[ch_name="${escapedName}"] {\n`;
-                        css += `    padding-top: ${paddingTop}px !important;\n`;
-                        css += `}\n`;
-                        css += `@media screen and (max-width: 768px) {\n`;
-                        css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
-                        css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-                        css += `    }\n`;
-                        css += `}\n`;
-                        
-                        // If extra styling is OFF, we also need the full padding (bottom/sides)
                         if (!settings.extraStylingEnabled) {
                             css += `#chat .mes[ch_name="${escapedName}"] {\n`;
-                            css += `    padding-bottom: 15px !important;\n`;
-                            css += `    padding-left: 25px !important;\n`;
-                            css += `    padding-right: 25px !important;\n`;
+                            css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
                             css += `}\n`;
                             css += `@media screen and (max-width: 768px) {\n`;
                             css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
-                            css += `        padding-bottom: 10px !important;\n`;
-                            css += `        padding-left: 15px !important;\n`;
-                            css += `        padding-right: 15px !important;\n`;
+                            css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
                             css += `    }\n`;
                             css += `}\n`;
                         }
@@ -237,15 +222,16 @@ export async function updateDynamicCSS() {
                     css += `    flex-basis: 100% !important;\n`;
                     css += `}\n`;
                     
-                    // Unified Persona Padding - Gated by Banner Toggle
-                    css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
-                    css += `    padding-top: ${paddingTop}px !important;\n`;
-                    css += `}\n`;
-                    css += `@media screen and (max-width: 768px) {\n`;
-                    css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
-                    css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-                    css += `    }\n`;
-                    css += `}\n`;
+                    if (!settings.extraStylingEnabled) {
+                        css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
+                        css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                        css += `}\n`;
+                        css += `@media screen and (max-width: 768px) {\n`;
+                        css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
+                        css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
+                        css += `        }\n`;
+                        css += `}\n`;
+                    }
 
                     if (!settings.extraStylingEnabled) {
                         css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
