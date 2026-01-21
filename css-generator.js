@@ -143,17 +143,10 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
             css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
             css += `}\n\n`;
             
-            css += `#chat ${selector}.has-avatar-banner {\n`;
-            css += `    padding-top: ${paddingTop}px !important;\n`;
-            css += `}\n\n`;
-            
             // Mobile
             css += `@media screen and (max-width: 768px) {\n`;
             css += `    #chat ${selector} {\n`;
             css += `        padding: 10px 15px 10px 15px !important;\n`;
-            css += `    }\n`;
-            css += `    #chat ${selector}.has-avatar-banner {\n`;
-            css += `        padding-top: ${paddingTopMobile}px !important;\n`;
             css += `    }\n`;
             css += `    ${selector} .name_text {\n`;
             css += `        font-size: ${fontSizeMobile}px !important;\n`;
@@ -164,7 +157,6 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
             // CHARACTER MESSAGES: Original behavior
             css += `#chat ${selector}.has-avatar-banner {\n`;
             css += `    position: relative;\n`;
-            css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
             css += `    background:\n`;
             css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
             css += `        var(${blurTintVar});\n`;
@@ -174,9 +166,6 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
             
             // Mobile
             css += `@media screen and (max-width: 768px) {\n`;
-            css += `    #chat ${selector}.has-avatar-banner {\n`;
-            css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-            css += `    }\n`;
             css += `    ${selector} .name_text {\n`;
             css += `        font-size: ${fontSizeMobile}px !important;\n`;
             css += `        padding: ${namePaddingTB}px ${namePaddingLR}px !important;\n`;
@@ -190,12 +179,10 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
         css += `}\n\n`;
     } else {
         // Moonlit Echoes Mode: Dynamic Styling for .mes_block
-        // This injects the USER'S accent color settings into the theme-compliant container
         css += `#chat ${selector}.moonlit-banner .mes_block {\n`;
-        css += `background:\n`;
+        css += `    background:\n`;
         css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
         css += `        var(${blurTintVar});\n`;
-        // Use user color for border/shadow if desired, or blend with theme
         css += `    border: ${rgba(rgb, 0.7)} solid 2px !important;\n`;
         css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
         css += `}\n\n`;

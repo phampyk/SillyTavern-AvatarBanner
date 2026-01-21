@@ -154,13 +154,28 @@ export async function updateDynamicCSS() {
                         css += `    display: none !important;\n`;
                         css += `}\n`;
                         
+                        // Structural padding logic - Centralized here and gated by banner presence
+                        css += `#chat .mes[ch_name="${escapedName}"] {\n`;
+                        css += `    padding-top: ${paddingTop}px !important;\n`;
+                        css += `}\n`;
+                        css += `@media screen and (max-width: 768px) {\n`;
+                        css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
+                        css += `        padding-top: ${paddingTopMobile}px !important;\n`;
+                        css += `    }\n`;
+                        css += `}\n`;
+                        
+                        // If extra styling is OFF, we also need the full padding (bottom/sides)
                         if (!settings.extraStylingEnabled) {
                             css += `#chat .mes[ch_name="${escapedName}"] {\n`;
-                            css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                            css += `    padding-bottom: 15px !important;\n`;
+                            css += `    padding-left: 25px !important;\n`;
+                            css += `    padding-right: 25px !important;\n`;
                             css += `}\n`;
                             css += `@media screen and (max-width: 768px) {\n`;
                             css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
-                            css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
+                            css += `        padding-bottom: 10px !important;\n`;
+                            css += `        padding-left: 15px !important;\n`;
+                            css += `        padding-right: 15px !important;\n`;
                             css += `    }\n`;
                             css += `}\n`;
                         }
@@ -222,14 +237,24 @@ export async function updateDynamicCSS() {
                     css += `    flex-basis: 100% !important;\n`;
                     css += `}\n`;
                     
+                    // Unified Persona Padding - Gated by Banner Toggle
+                    css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
+                    css += `    padding-top: ${paddingTop}px !important;\n`;
+                    css += `}\n`;
+                    css += `@media screen and (max-width: 768px) {\n`;
+                    css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
+                    css += `        padding-top: ${paddingTopMobile}px !important;\n`;
+                    css += `    }\n`;
+                    css += `}\n`;
+
                     if (!settings.extraStylingEnabled) {
                         css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
-                        css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                        css += `    padding-bottom: 15px !important;\n`;
                         css += `}\n`;
                         css += `@media screen and (max-width: 768px) {\n`;
                         css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
-                        css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-                        css += `        }\n`;
+                        css += `        padding-bottom: 10px !important;\n`;
+                        css += `    }\n`;
                         css += `}\n`;
                     }
                 }
@@ -387,14 +412,15 @@ export async function applyBannersToChat() {
             const isUser = mes.getAttribute('is_user') === 'true';
             
             if (isUser) {
-                // Remove existing Moonlit classes first
-                mes.classList.remove('moonlit-banner', 'has-avatar-banner');
+                // Reset classes first for a clean state
+                mes.classList.remove('has-avatar-banner', 'moonlit-banner');
 
+                // SAFETY CHECK: Bot must have a banner for persona styling to activate
                 if (!anyCharacterHasBanner) {
                     return;
                 }
                 
-                // If either banners or extra styling is enabled, we need the structural classes
+                // If either banners or extra styling is enabled, persona gets the structural classes
                 if (settings.enableUserBanners || settings.extraStylingEnabled) {
                     mes.classList.add('has-avatar-banner');
                     if (settings.moonlitCompatibility) {
@@ -402,12 +428,15 @@ export async function applyBannersToChat() {
                     }
                 }
 
-                // If persona banners are disabled but extra styling is on, we skip injection but kept classes
-                if (!settings.enableUserBanners && !settings.extraStylingEnabled) {
-                     mes.classList.remove('has-avatar-banner', 'moonlit-banner');
-                     return;
-                } else if (!settings.enableUserBanners) {
-                     // Keep classes for CSS but skip image injection logic
+                // Decision: Fetch banner image ONLY if enableUserBanners is true
+                if (!settings.enableUserBanners) {
+                     // If styling is also OFF, we removed classes above and already checked bot dependency,
+                     // but let's be explicit and return if nothing to do.
+                     if (!settings.extraStylingEnabled) {
+                         mes.classList.remove('has-avatar-banner', 'moonlit-banner');
+                         return;
+                     }
+                     // ELSE: Styling is active! Keep classes but skip image injection logic below.
                 }
             } else {
                 if (!anyCharacterHasBanner) {
