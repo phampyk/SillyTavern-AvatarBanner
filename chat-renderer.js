@@ -421,16 +421,18 @@ export async function applyBannersToChat() {
             let bannerDataUrl = null;
             
             if (isUser) {
-                const forceAvatar = mes.getAttribute('force_avatar');
-                let userAvatarPath;
-                if (forceAvatar && forceAvatar.startsWith('User Avatars/')) {
-                    userAvatarPath = forceAvatar.replace('User Avatars/', '');
-                } else {
-                    userAvatarPath = getCurrentUserAvatar();
-                }
-                
-                if (userAvatarPath) {
-                    bannerDataUrl = getUserBanner(userAvatarPath);
+                if (settings.enableUserBanners) {
+                    const forceAvatar = mes.getAttribute('force_avatar');
+                    let userAvatarPath;
+                    if (forceAvatar && forceAvatar.startsWith('User Avatars/')) {
+                        userAvatarPath = forceAvatar.replace('User Avatars/', '');
+                    } else {
+                        userAvatarPath = getCurrentUserAvatar();
+                    }
+                    
+                    if (userAvatarPath) {
+                        bannerDataUrl = getUserBanner(userAvatarPath);
+                    }
                 }
             } else {
                 const charName = mes.getAttribute('ch_name');
