@@ -1,0 +1,116 @@
+.mes.has-avatar-banner {
+  position: relative;
+  overflow: visible !important;
+}
+
+.mes.has-avatar-banner .mes_block,
+.mes.has-avatar-banner .mes_text,
+.mes.has-avatar-banner .ch_name,
+.mes.has-avatar-banner .avatar {
+  position: relative;
+  z-index: 2;
+}
+
+.mes.has-avatar-banner .ch_name,
+.mes.has-avatar-banner .mes_block {
+  overflow: visible !important;
+}
+
+.mes.has-avatar-banner:not(.moonlit-banner)
+  .ch_name
+  > .flex-container
+  > .flex-container.alignItemsBaseline {
+  flex-wrap: wrap !important;
+}
+.mes.has-avatar-banner:not(.moonlit-banner) .ch_name .name_text {
+  flex-basis: 100% !important;
+}
+
+.avatar-banner-settings .inline-drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+
+.avatar-banner-settings .checkbox_label {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.avatar-banner-settings .checkbox_label input[type="checkbox"] {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.avatar-banner-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.avatar-banner-font-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.avatar-banner-font-row input[type="text"].text_pole {
+  flex: 1;
+  margin: 0;
+}
+
+.avatar-banner-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.avatar-banner-inline.disabled,
+.avatar-banner-font-row.disabled,
+.avatar-banner-grid-row .disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.avatar-banner-grid-row input[type="text"].text_pole {
+  margin: 0;
+}
+
+#avatar_banner_button,
+#persona_banner_button {
+  cursor: pointer;
+}
+
+
+/* Moonlit Echoes Compatibility */
+.mes.has-avatar-banner.moonlit-banner .mes_block {
+    position: relative;
+    /* Background/Border handled dynamically by css-generator.js */
+    /* overflow: visible removed to allow parent cropping as requested */
+}
+
+.mes.has-avatar-banner.moonlit-banner .avatar-banner {
+    z-index: 1;
+    /* Inherit TOP border radius to match parent cropping without breaking bottom/swipes */
+    border-top-left-radius: inherit !important;
+    border-top-right-radius: inherit !important;
+    overflow: hidden; /* inner overflow for banner */
+}
+
+.mes.has-avatar-banner.moonlit-banner .mes_text,
+.mes.has-avatar-banner.moonlit-banner .ch_name {
+    position: relative;
+    z-index: 2;
+}
+
+/* Neutralize conflicting Moonlit Theme properties */
+#chat .mes.has-avatar-banner.moonlit-banner .timestamp,
+#chat .mes.has-avatar-banner.moonlit-banner .icon-svg,
+#chat .mes.has-avatar-banner.moonlit-banner .timestamp-icon {
+    aspect-ratio: auto !important;
+    place-self: auto !important;
+    margin-right: 0 !important;
+}
