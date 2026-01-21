@@ -3,6 +3,8 @@
 
 Inspired by @Rivelle from [a CSS snippet she shared on SillyTavern's discord](https://discord.com/channels/1100685673633153084/1335308918259454122) and I loved it so I wanted an easier way to set it up, more userfriendly for people who don't want to fumble with CSS or a more accessible way to set the banner. 
 
+21-01: Now with compatibility with [Moonlit Echoes theme](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme). If you have Moonlit Echoes installed it will apply to the bubble and flat style automatically. No other styles would be affected, they are already beautifully crafted.
+
 > [!Important]
 > This extension has been created with Claude. Vibecoded if you will. If you don't trust it, you don't like it or you don't support it is absolutely fine, this was to scratch my own itch more than anything and I use it myself.
 
