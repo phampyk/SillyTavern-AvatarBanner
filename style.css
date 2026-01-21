@@ -106,11 +106,34 @@
     z-index: 2;
 }
 
-/* Neutralize conflicting Moonlit Theme properties */
 #chat .mes.has-avatar-banner.moonlit-banner .timestamp,
 #chat .mes.has-avatar-banner.moonlit-banner .icon-svg,
 #chat .mes.has-avatar-banner.moonlit-banner .timestamp-icon {
     aspect-ratio: auto !important;
     place-self: auto !important;
     margin-right: 0 !important;
+}
+
+/* Fix for Moonlit Echoes Popup Buttons (Firefox Compatibility) */
+.popup.avatar-banner-popup {
+    box-sizing: border-box !important;
+    max-width: 800px !important;
+    width: 95% !important;
+    max-height: 95dvh !important;
+}
+.popup.avatar-banner-popup .popup-body {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+}
+.popup.avatar-banner-popup .popup-content {
+    flex-grow: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+}
+.popup.avatar-banner-popup .popup-controls {
+    flex-shrink: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    padding: 10px 0 !important;
 }

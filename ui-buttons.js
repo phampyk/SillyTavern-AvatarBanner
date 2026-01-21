@@ -1,41 +1,30 @@
 /**
  * Avatar Banner Extension - UI Buttons
- * EXACT copy from v3.3.3 lines 245-410, 1142-1262
  */
-
 import { getCurrentCharacterAvatar, getPersonaImageUrlFullRes } from './utils.js';
-import { getCharacterBanner, getUserBanner, saveCharacterBanner, saveUserBanner, removeCharacterBanner, removeUserBanner } from './banner-manager.js';
+import { getCharacterBanner, saveCharacterBanner, removeCharacterBanner, getUserBanner, saveUserBanner, removeUserBanner } from './banner-manager.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
-// Module-level references (set by init function)
 let applyBannersToChat = null;
 let ExtensionState = null;
 
-/**
- * Initialize ui-buttons module with dependencies
- */
 export function initUIButtons(applyBannersFn, extensionState) {
     applyBannersToChat = applyBannersFn;
     ExtensionState = extensionState;
 }
 
-/**
- * Show popup with options to Edit or Delete banner
- */
 async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
     const context = SillyTavern.getContext();
     const { Popup, POPUP_TYPE } = context;
     
     if (!Popup || !POPUP_TYPE) {
-        // Fallback: just open editor
         onEdit();
         return;
     }
     
-    // Use a simple confirm popup first asking if they want to remove
     const removeConfirm = new Popup(
         `Banner exists for ${displayName}`,
         POPUP_TYPE.CONFIRM,
@@ -51,11 +40,9 @@ async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
     
     const result = await removeConfirm.show();
     
-    // result is true for OK (Edit), false/0 for Cancel (Remove)
     if (result === true || result === 1) {
         onEdit();
     } else if (result === false || result === 0) {
-        // Confirm deletion
         const deleteConfirm = new Popup(
             'Confirm Removal',
             POPUP_TYPE.CONFIRM,
@@ -73,9 +60,6 @@ async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
     }
 }
 
-/**
- * Open the banner crop editor
- */
 async function openBannerEditor(avatarPath, displayName, isUser = false, characterId = null) {
     if (!avatarPath) {
         toastr.warning('No avatar found');
@@ -90,20 +74,12 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
         return;
     }
 
-    let avatarUrl;
-    if (isUser) {
-        avatarUrl = getPersonaImageUrlFullRes(avatarPath);
-    } else {
-        avatarUrl = `/characters/${avatarPath}`;
-    }
+    let avatarUrl = isUser ? getPersonaImageUrlFullRes(avatarPath) : `/characters/${avatarPath}`;
 
     try {
-        console.log(`[${extensionName}]`, 'Loading avatar from:', avatarUrl);
-        
         const response = await fetch(avatarUrl);
-        if (!response.ok) {
-            throw new Error(`Failed to load avatar: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Failed to load avatar: ${response.status}`);
+        
         const blob = await response.blob();
         const dataUrl = await new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -111,8 +87,6 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
-
-        console.log(`[${extensionName}]`, 'Avatar loaded, opening crop editor');
 
         const popup = new Popup(
             `Configure banner for ${displayName}`,
@@ -125,6 +99,7 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
                 cancelButton: 'Cancel',
             }
         );
+        popup.dlg.classList.add('avatar-banner-popup');
 
         const result = await popup.show();
 
@@ -144,18 +119,9 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
     }
 }
 
-/**
- * Handle banner button click - show options if banner exists, otherwise open editor
- */
 async function handleBannerButtonClick(avatarPath, displayName, isUser, characterId = null) {
     try {
-        let existingBanner;
-        
-        if (isUser) {
-            existingBanner = getUserBanner(avatarPath);
-        } else {
-            existingBanner = await getCharacterBanner(characterId);
-        }
+        let existingBanner = isUser ? getUserBanner(avatarPath) : await getCharacterBanner(characterId);
         
         if (existingBanner) {
             await showBannerOptionsPopup(
@@ -176,67 +142,44 @@ async function handleBannerButtonClick(avatarPath, displayName, isUser, characte
         }
     } catch (error) {
         console.error(`[${extensionName}]`, 'Error handling banner button click:', error);
-        toastr.error('Error processing banner');
     }
 }
 
-/**
- * Add button to character editor panel (with proper cleanup tracking)
- */
 export function addCharacterEditorButton() {
-    // Setup event handler with cleanup tracking (once)
+    if (!ExtensionState || !ExtensionState.initialized) return;
+
     if (!ExtensionState.charClickHandlerBound) {
         const handler = async function(e) {
             e.preventDefault();
             e.stopPropagation();
+            const context = SillyTavern.getContext();
+            const characterId = context.characterId;
+            const avatarPath = getCurrentCharacterAvatar();
+            const charName = context.characters?.[characterId]?.name || 'Character';
             
-            try {
-                const context = SillyTavern.getContext();
-                const characterId = context.characterId;
-                const avatarPath = getCurrentCharacterAvatar();
-                const charName = context.characters?.[characterId]?.name || 'Character';
-                
-                if (avatarPath && characterId !== undefined) {
-                    await handleBannerButtonClick(avatarPath, charName, false, characterId);
-                } else {
-                    toastr.warning('No character avatar found');
-                }
-            } catch (error) {
-                console.error(`[${extensionName}]`, 'Error in character banner button:', error);
+            if (avatarPath && characterId !== undefined) {
+                await handleBannerButtonClick(avatarPath, charName, false, characterId);
             }
         };
         
         jQuery(document).on('click', '#avatar_banner_button', handler);
         ExtensionState.charClickHandlerBound = true;
-        
-        // Track for cleanup
         ExtensionState.cleanupFunctions.push(() => {
             jQuery(document).off('click', '#avatar_banner_button', handler);
             ExtensionState.charClickHandlerBound = false;
         });
     }
 
-    // Don't add button if it already exists
-    if (document.getElementById('avatar_banner_button')) {
-        return;
-    }
+    if (document.getElementById('avatar_banner_button')) return;
 
-    let buttonsBlock = document.querySelector('#avatar_controls .form_create_bottom_buttons_block');
-    if (!buttonsBlock) {
-        return;
-    }
-    if (!buttonsBlock) {
-        return;
-    }
+    const buttonsBlock = document.querySelector('#avatar_controls .form_create_bottom_buttons_block');
+    if (!buttonsBlock) return;
 
     const button = document.createElement('div');
     button.id = 'avatar_banner_button';
     button.className = 'menu_button fa-solid fa-panorama interactable';
     button.title = 'Configure Avatar Banner';
-    button.setAttribute('data-i18n', '[title]Configure Avatar Banner');
-    button.setAttribute('tabindex', '0');
-    button.setAttribute('role', 'button');
-
+    
     const deleteButton = buttonsBlock.querySelector('#delete_button');
     if (deleteButton) {
         buttonsBlock.insertBefore(button, deleteButton);
@@ -245,16 +188,11 @@ export function addCharacterEditorButton() {
     }
 }
 
-/**
- * Add button to persona panel (with proper cleanup tracking)
- */
 export function addPersonaPanelButton() {
-    // Setup event handler with cleanup tracking (once)
+    if (!ExtensionState || !ExtensionState.initialized) return;
+
     if (!ExtensionState.personaClickHandlerBound) {
         const handler = async function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
             try {
                 const userAvatar = user_avatar;
                 const userName = power_user.personas[userAvatar] || power_user.name || 'User';
@@ -271,32 +209,22 @@ export function addPersonaPanelButton() {
         
         jQuery(document).on('click', '#persona_banner_button', handler);
         ExtensionState.personaClickHandlerBound = true;
-        
-        // Track for cleanup
         ExtensionState.cleanupFunctions.push(() => {
             jQuery(document).off('click', '#persona_banner_button', handler);
             ExtensionState.personaClickHandlerBound = false;
         });
     }
 
-    // Don't add button if it already exists
-    if (document.getElementById('persona_banner_button')) {
-        return;
-    }
+    if (document.getElementById('persona_banner_button')) return;
 
     const buttonsBlock = document.querySelector('#persona_controls .persona_controls_buttons_block');
-    if (!buttonsBlock) {
-        return;
-    }
+    if (!buttonsBlock) return;
 
     const button = document.createElement('div');
     button.id = 'persona_banner_button';
     button.className = 'menu_button fa-solid fa-panorama interactable';
     button.title = 'Configure Persona Banner';
-    button.setAttribute('data-i18n', '[title]Configure Persona Banner');
-    button.setAttribute('tabindex', '0');
-    button.setAttribute('role', 'button');
-
+    
     const deleteButton = buttonsBlock.querySelector('#persona_delete_button');
     if (deleteButton) {
         buttonsBlock.insertBefore(button, deleteButton);

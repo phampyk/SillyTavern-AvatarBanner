@@ -1,6 +1,5 @@
 /**
  * Avatar Banner Extension - Utility Functions
- * EXACT copy from v3.3.3 lines 70-157, 459-480
  */
 
 import { user_avatar } from '../../../personas.js';
@@ -103,6 +102,7 @@ export function getPersonaImageUrlFullRes(avatarFilename) {
  * Generate CSS selector-safe string from character name
  */
 export function escapeCSS(str) {
+    if (!str) return '';
     return str.replace(/["\\]/g, '\\$&');
 }
 
@@ -136,4 +136,16 @@ export function hexToRgb(hex) {
  */
 export function rgba(rgbObj, alpha) {
     return `rgba(${rgbObj.r}, ${rgbObj.g}, ${rgbObj.b}, ${alpha})`;
+}
+
+/**
+ * Check if Moonlit Echoes theme is active (either via setting or auto-detection)
+ */
+export function isMoonlitTheme(settings) {
+    // Auto-detection via body classes or specific theme style elements
+    const moonlitClasses = ['echostyle', 'whisperstyle', 'hushstyle', 'ripplestyle', 'tidestyle'];
+    const hasMoonlitClass = moonlitClasses.some(cls => document.body.classList.contains(cls));
+    const hasMoonlitStyle = !!document.getElementById('MoonlitEchosTheme-style');
+    
+    return hasMoonlitClass || hasMoonlitStyle;
 }

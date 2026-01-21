@@ -1,6 +1,5 @@
 /**
  * Avatar Banner Extension - UI Settings
- * EXACT copy from v3.3.3 lines 1265-1630
  */
 
 import { escapeHtml } from './utils.js';
@@ -8,10 +7,6 @@ import { preloadGoogleFont } from './fonts.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
-/**
- * Create and inject the settings panel HTML
- * (Keeping ALL your original styling features)
- */
 export function createSettingsPanel(getSettings, saveSettings, applyBannersToChat, ExtensionState) {
     const settings = getSettings();
     const disabledClass = settings.extraStylingEnabled ? '' : 'disabled';
@@ -46,18 +41,10 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
                     <label class="checkbox_label flexnowrap ${disabledClass}" for="avatar_banner_use_display_name" id="avatar_banner_display_name_row">
                         <input type="checkbox" id="avatar_banner_use_display_name" ${settings.useDisplayName ? 'checked' : ''}>
                         <span>Use Display Name</span>
-                        <div class="fa-solid fa-circle-info opacity50p" title="Show short display name instead of full card name (e.g. 'Bo' instead of 'Bo ║ Teenage Dirtbag'). Only works with extra styling enabled."></div>
+                        <div class="fa-solid fa-circle-info opacity50p" title="Show short display name instead of full card name. Only works with extra styling enabled."></div>
                     </label>
                 </div>
                 
-                <div class="avatar-banner-grid-row">
-                    <label class="checkbox_label flexnowrap" for="avatar_banner_moonlit_compatibility">
-                        <input type="checkbox" id="avatar_banner_moonlit_compatibility" ${settings.moonlitCompatibility ? 'checked' : ''}>
-                        <span>Moonlit Echoes Compatibility</span>
-                        <div class="fa-solid fa-circle-info opacity50p" title="Force compatibility mode for Moonlit Echoes theme if auto-detection fails."></div>
-                    </label>
-                    <div style="min-height: 1px;"></div>
-                </div>
 
                 <div class="avatar-banner-grid-row">
                     <div class="avatar-banner-inline ${disabledClass}" id="avatar_banner_color_row">
@@ -70,7 +57,7 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
                 
                 <div class="avatar-banner-font-row ${disabledClass}" id="avatar_banner_font_row">
                     <span>Font Family</span>
-                    <div class="fa-solid fa-circle-info opacity50p" title="Enter a font name (e.g. Caveat) or paste the full @import from Google Fonts for special fonts"></div>
+                    <div class="fa-solid fa-circle-info opacity50p" title="Enter a font name (e.g. Caveat) or paste the full @import from Google Fonts"></div>
                     <input type="text" id="avatar_banner_font" class="text_pole" placeholder="Font name or @import url(...)" value="${escapeHtml(settings.fontFamily || '')}">
                 </div>
                 
@@ -122,7 +109,6 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
         container.innerHTML = settingsHtml;
         extensionsSettings.appendChild(container);
 
-        // Attach event listeners (EXACT legacy behavior)
         document.getElementById('avatar_banner_enabled').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.enabled = e.target.checked;
@@ -130,12 +116,6 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
             applyBannersToChat();
         });
 
-        document.getElementById('avatar_banner_moonlit_compatibility').addEventListener('change', (e) => {
-            const settings = getSettings();
-            settings.moonlitCompatibility = e.target.checked;
-            saveSettings();
-            applyBannersToChat();
-        });
 
         document.getElementById('avatar_banner_user_enabled').addEventListener('change', (e) => {
             const settings = getSettings();
@@ -259,14 +239,12 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
             const settings = getSettings();
             const newFont = e.target.value.trim();
             
-            // Only force reload if font actually changed
             if (settings.fontFamily !== newFont) {
                 settings.fontFamily = newFont;
                 saveSettings();
                 
-                // Force reload font with cache busting
                 if (settings.extraStylingEnabled && newFont) {
-                    preloadGoogleFont(newFont, true, ExtensionState); // forceReload = true
+                    preloadGoogleFont(newFont, true, ExtensionState);
                 }
                 
                 applyBannersToChat();

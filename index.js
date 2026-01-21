@@ -1,14 +1,10 @@
 /**
- * Avatar Banner Extension for SillyTavern - Modular Version
- * Based on v3.3.3 - Split into modules for maintainability
- *
- * @version 3.3.3-modular
+ * Avatar Banner Extension for SillyTavern
+ * Provides customizable banners and styling for chat messages.
  */
-
 import { eventSource, event_types, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings } from '../../../extensions.js';
 
-// Module imports
 import { createSettingsPanel } from './ui-settings.js';
 import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons } from './ui-buttons.js';
 import { applyBannersToChat, initChatRenderer } from './chat-renderer.js';
@@ -16,37 +12,30 @@ import { initBannerManager } from './banner-manager.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
-// Namespaced state for proper cleanup (prevents memory leaks) - matches legacy
 const ExtensionState = {
     cleanupFunctions: [],
     observer: null,
     initialized: false,
-    currentLoadedFont: null, // Track currently loaded font to prevent flickering on chat changes
+    currentLoadedFont: null,
     charClickHandlerBound: false,
     personaClickHandlerBound: false,
 };
 
-// Default settings (global settings only - banners stored per-character) - matches legacy
 const defaultSettings = {
     enabled: true,
     bannerHeight: 150,
-    enableUserBanners: false, // legacy uses enableUserBanners
-    userBanners: {}, // Only for persona banners: { [personaAvatar]: dataUrl }
-    // v2 styling options
+    enableUserBanners: false,
+    userBanners: {},
     extraStylingEnabled: false,
     fontFamily: '',
-    accentColor: '#e79fa8', // Default pinkish color
-    fontSize: 36, // Name text font size
-    namePaddingTB: 6, // Name text padding top/bottom (px)
-    namePaddingLR: 10, // Name text padding left/right (px)
-    namePaddingLR: 10, // Name text padding left/right (px)
-    useDisplayName: false, // Use short display name instead of full card name (for CharacterName ext)
-    moonlitCompatibility: false, // Manual override for Moonlit Echoes theme compatibility
+    accentColor: '#e79fa8',
+    fontSize: 36,
+    namePaddingTB: 6,
+    namePaddingLR: 10,
+    useDisplayName: false,
 };
 
-/**
- * Get extension settings, initializing if needed (matches legacy)
- */
+
 function getSettings() {
     if (!extension_settings[extensionName]) {
         extension_settings[extensionName] = { ...defaultSettings };
@@ -57,19 +46,13 @@ function getSettings() {
     return extension_settings[extensionName];
 }
 
-/**
- * Save settings using ST's API (matches legacy)
- */
 function saveSettings() {
     saveSettingsDebounced();
 }
 
-/**
- * Setup optimized MutationObserver for UI panels (with cleanup tracking)
- */
 function setupMutationObserver() {
     if (ExtensionState.observer) {
-        return; // Already setup
+        return;
     }
     
     const observer = new MutationObserver((mutations) => {
@@ -101,7 +84,7 @@ function setupMutationObserver() {
                 childList: true,
                 attributes: true,
                 attributeFilter: ['style'],
-                subtree: false // OPTIMIZED: Don't watch deep tree
+                subtree: false
             });
         }
         
@@ -123,7 +106,6 @@ function setupMutationObserver() {
     
     ExtensionState.observer = observer;
     
-    // Track for cleanup
     ExtensionState.cleanupFunctions.push(() => {
         if (ExtensionState.observer) {
             ExtensionState.observer.disconnect();
@@ -132,12 +114,8 @@ function setupMutationObserver() {
     });
 }
 
-/**
- * Cleanup function to remove all extension elements and listeners
- */
 function cleanup() {
     try {
-        // Execute all cleanup functions
         ExtensionState.cleanupFunctions.forEach(fn => {
             try {
                 fn();
@@ -147,30 +125,24 @@ function cleanup() {
         });
         ExtensionState.cleanupFunctions = [];
 
-        // Disconnect observer
         if (ExtensionState.observer) {
             ExtensionState.observer.disconnect();
             ExtensionState.observer = null;
         }
 
-        // Remove dynamic styles
         const dynamicStyles = document.getElementById('avatar-banner-dynamic-styles');
         if (dynamicStyles) dynamicStyles.remove();
 
-        // Remove static styles
         const staticStyles = document.getElementById('avatar-banner-styles');
         if (staticStyles) staticStyles.remove();
 
-        // Reset loaded font state (legacy behavior)
         ExtensionState.currentLoadedFont = null;
 
-        // Remove all banners from DOM
         document.querySelectorAll('.avatar-banner').forEach(el => el.remove());
         document.querySelectorAll('.mes').forEach(mes => {
-            mes.classList.remove('has-avatar-banner');
+            mes.classList.remove('has-avatar-banner', 'moonlit-banner');
         });
 
-        // Remove buttons
         const charButton = document.getElementById('avatar_banner_button');
         if (charButton) charButton.remove();
 
@@ -182,28 +154,19 @@ function cleanup() {
     }
 }
 
-/**
- * Initialize the extension
- */
 async function init() {
     if (ExtensionState.initialized) {
-        console.log(`[${extensionName}]`, 'Already initialized, skipping');
         return;
     }
     try {
-        console.log(`[${extensionName}]`, 'Initializing v3.1.0...');
-
-        // Initialize settings and UI (legacy order)
         getSettings();
 
         createSettingsPanel(getSettings, saveSettings, applyBannersToChat, ExtensionState);
 
-        // Initialize modules with dependencies
         initBannerManager(getSettings, saveSettings);
         initUIButtons(applyBannersToChat, ExtensionState);
         initChatRenderer(getSettings, ExtensionState);
 
-        // Register event handlers with cleanup tracking (matches legacy)
         const chatChangedHandler = () => {
             applyBannersToChat();
             addCharacterEditorButton();
@@ -245,10 +208,8 @@ async function init() {
             eventSource.removeListener(event_types.SETTINGS_UPDATED, settingsUpdatedHandler);
         });
 
-        // Setup optimized MutationObserver (legacy)
         setupMutationObserver();
 
-        // Initial application (legacy)
         setTimeout(() => {
             applyBannersToChat();
             addCharacterEditorButton();
@@ -256,23 +217,18 @@ async function init() {
         }, 1000);
 
         ExtensionState.initialized = true;
-        console.log(`[${extensionName}]`, 'Initialization complete');
     } catch (error) {
         console.error(`[${extensionName}]`, 'Error during initialization:', error);
     }
-
 }
 
-// jQuery ready - standard ST extension pattern
 jQuery(() => {
     init();
 });
 
-// Export cleanup for extension system
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { cleanup };
 }
 
-// Make cleanup available globally for manual cleanup if needed
 window.AvatarBannerExtension = window.AvatarBannerExtension || {};
 window.AvatarBannerExtension.cleanup = cleanup;
