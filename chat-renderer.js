@@ -193,45 +193,51 @@ export async function updateDynamicCSS() {
         }
         
         // User messages CSS
-        if (anyCharacterHasBanner && settings.enableUserBanners) {
-            css += `/* User Messages - Banner Mode */\n`;
+        // Restore: Generate CSS if either banners or extra styling is enabled
+        if (anyCharacterHasBanner && (settings.enableUserBanners || settings.extraStylingEnabled)) {
+            css += `/* User Messages - Banner/Styling Mode */\n`;
             
             if (isMoonlit) {
                 // Moonlit User Message Styling
-                 css += `#chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
-                  css += `    padding-top: ${paddingTop}px !important;\n`;
-                  css += `}\n`;
-                  css += `@media screen and (max-width: 768px) {\n`;
-                  css += `    #chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
-                  css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-                  css += `    }\n`;
-                  css += `}\n`;
+                if (settings.enableUserBanners) {
+                     css += `#chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
+                     css += `    padding-top: ${paddingTop}px !important;\n`;
+                     css += `}\n`;
+                     css += `@media screen and (max-width: 768px) {\n`;
+                     css += `    #chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
+                     css += `        padding-top: ${paddingTopMobile}px !important;\n`;
+                     css += `    }\n`;
+                     css += `}\n`;
+                }
             } else {
-                css += `.mes[is_user="true"] .avatar {\n`;
-                css += `    display: none !important;\n`;
-                css += `}\n`;
-                
-                css += `.mes[is_user="true"] .ch_name,\n`;
-                css += `.mes[is_user="true"] .mes_block {\n`;
-                css += `    overflow: visible !important;\n`;
-                css += `}\n`;
-                
-                css += `.mes[is_user="true"] .ch_name > .flex-container > .flex-container.alignItemsBaseline {\n`;
-                css += `    flex-wrap: wrap !important;\n`;
-                css += `}\n`;
-                css += `.mes[is_user="true"] .ch_name .name_text {\n`;
-                css += `    flex-basis: 100% !important;\n`;
-                css += `}\n`;
-                
-                if (!settings.extraStylingEnabled) {
-                    css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
-                    css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                // Standard mode structural overrides - ONLY if banner is enabled
+                if (settings.enableUserBanners) {
+                    css += `.mes[is_user="true"] .avatar {\n`;
+                    css += `    display: none !important;\n`;
                     css += `}\n`;
-                    css += `@media screen and (max-width: 768px) {\n`;
-                    css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
-                    css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-                    css += `        }\n`;
+                    
+                    css += `.mes[is_user="true"] .ch_name,\n`;
+                    css += `.mes[is_user="true"] .mes_block {\n`;
+                    css += `    overflow: visible !important;\n`;
                     css += `}\n`;
+                    
+                    css += `.mes[is_user="true"] .ch_name > .flex-container > .flex-container.alignItemsBaseline {\n`;
+                    css += `    flex-wrap: wrap !important;\n`;
+                    css += `}\n`;
+                    css += `.mes[is_user="true"] .ch_name .name_text {\n`;
+                    css += `    flex-basis: 100% !important;\n`;
+                    css += `}\n`;
+                    
+                    if (!settings.extraStylingEnabled) {
+                        css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
+                        css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                        css += `}\n`;
+                        css += `@media screen and (max-width: 768px) {\n`;
+                        css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
+                        css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
+                        css += `        }\n`;
+                        css += `}\n`;
+                    }
                 }
             }
             
