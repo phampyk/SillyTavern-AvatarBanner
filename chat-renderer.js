@@ -129,61 +129,50 @@ export async function updateDynamicCSS() {
                 }
             }
             
-            if (hasBanner) {
-                css += `/* ${displayName} - Has Banner */\n`;
-                
-                if (isMoonlit) {
-                     // Moonlit Mode: Do NOT hide avatar if theme needs it (safest is to let theme handle it or hide if confirmed)
-                     // Standard ST extension hides it. Let's start by NOT hiding it if we are injecting into mes_block
-                     // effectively making banner a background header.
-                     // But we DO need to adjust padding of mes_block.
-                     
-                     // Actually, if we inject into mes_block, we likely don't want to hide the avatar 
-                     // because the avatar is outside mes_block in standard layout.
-                     // The user snippet implies stylistic changes.
-                     
-                     /* Moonlit specific dynamic sizing */
-                     css += `#chat .mes[ch_name="${escapedName}"].moonlit-banner .mes_block {\n`;
-                     // Use the calculated padding top but + adjustment for Moonlit's large header feel?
-                     // Snippet had 120px padding. Let's use our calculated height or settings.
-                     // Snippet: padding: 120px 25px 15px !important;
-                     // Our calculated variable 'paddingTop' is (height - 30).
-                     // If banner is 150px, padding is 120px. Matches perfectly.
-                     css += `    padding-top: ${paddingTop}px !important;\n`;
-                     css += `}\n`;
-                     css += `@media screen and (max-width: 768px) {\n`;
-                     css += `    #chat .mes[ch_name="${escapedName}"].moonlit-banner .mes_block {\n`;
-                     css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-                     css += `    }\n`;
-                     css += `}\n`;
-                } else {
-                    // Standard Mode
-                    css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
-                    css += `    display: none !important;\n`;
+            if (isMoonlit) {
+                if (hasBanner) {
+                    css += `/* ${displayName} - Has Banner (Moonlit) */\n`;
+                    css += `#chat .mes[ch_name="${escapedName}"].moonlit-banner .mes_block {\n`;
+                    css += `    padding-top: ${paddingTop}px !important;\n`;
+                    css += `}\n`;
+                    css += `@media screen and (max-width: 768px) {\n`;
+                    css += `    #chat .mes[ch_name="${escapedName}"].moonlit-banner .mes_block {\n`;
+                    css += `        padding-top: ${paddingTopMobile}px !important;\n`;
+                    css += `    }\n`;
                     css += `}\n`;
                     
-                    if (!settings.extraStylingEnabled) {
-                        css += `#chat .mes[ch_name="${escapedName}"] {\n`;
-                        css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
-                        css += `}\n`;
-                        css += `@media screen and (max-width: 768px) {\n`;
-                        css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
-                        css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-                        css += `    }\n`;
-                        css += `}\n`;
+                    if (settings.extraStylingEnabled) {
+                        css += generateExtraStylingCSS(nameForSelector, false, settings, displayName, isMoonlit);
                     }
                 }
-                
-                css += `\n`;
-                
-                if (settings.extraStylingEnabled) {
-                    // Pass nameForSelector (for CSS selector) and displayName (for text override)
-                    css += generateExtraStylingCSS(nameForSelector, false, settings, displayName, isMoonlit);
-                }
             } else {
-                // Only restore avatar in standard mode, Moonlit might not have hidden it
-                if (!isMoonlit) {
-                    css += `/* ${displayName} - No Banner, Show Avatar */\n`;
+                // Standard Theme Path
+                if (hasBanner || settings.extraStylingEnabled) {
+                    if (hasBanner) {
+                        css += `/* ${displayName} - Has Banner (Standard) */\n`;
+                        css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
+                        css += `    display: none !important;\n`;
+                        css += `}\n`;
+                        
+                        if (!settings.extraStylingEnabled) {
+                            css += `#chat .mes[ch_name="${escapedName}"] {\n`;
+                            css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
+                            css += `}\n`;
+                            css += `@media screen and (max-width: 768px) {\n`;
+                            css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
+                            css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
+                            css += `    }\n`;
+                            css += `}\n`;
+                        }
+                    } else {
+                        css += `/* ${displayName} - Styled, No Banner (Standard) */\n`;
+                    }
+
+                    if (settings.extraStylingEnabled) {
+                        css += generateExtraStylingCSS(nameForSelector, false, settings, displayName, isMoonlit);
+                    }
+                } else {
+                    css += `/* ${displayName} - No Banner/Styling, Show Avatar */\n`;
                     css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
                     css += `    display: flex !important;\n`;
                     css += `    visibility: visible !important;\n`;
@@ -198,7 +187,7 @@ export async function updateDynamicCSS() {
             css += `/* User Messages - Banner/Styling Mode */\n`;
             
             if (isMoonlit) {
-                // Moonlit User Message Styling
+                // Moonlit User Message Styling - Only if banners are enabled
                 if (settings.enableUserBanners) {
                      css += `#chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
                      css += `    padding-top: ${paddingTop}px !important;\n`;
@@ -208,6 +197,10 @@ export async function updateDynamicCSS() {
                      css += `        padding-top: ${paddingTopMobile}px !important;\n`;
                      css += `    }\n`;
                      css += `}\n`;
+                     
+                     if (settings.extraStylingEnabled) {
+                         css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
+                     }
                 }
             } else {
                 // Standard mode structural overrides - ONLY if banner is enabled
@@ -239,11 +232,11 @@ export async function updateDynamicCSS() {
                         css += `}\n`;
                     }
                 }
-            }
-            
-            // MOVED OUTSIDE: Generate font styling regardless of Moonlit or Standard mode
-            if (settings.extraStylingEnabled) {
-                css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
+                
+                // For standard themes, styling persists even if banners are off
+                if (settings.extraStylingEnabled) {
+                    css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
+                }
             }
             css += `\n`;
         }

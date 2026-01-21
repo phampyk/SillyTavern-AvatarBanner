@@ -182,6 +182,11 @@ export function generateExtraStylingCSS(characterName, isUser, settings, display
             css += `    }\n`;
             css += `}\n\n`;
         }
+
+        // Standard Theme: Hide avatar whenever styling is active
+        css += `#chat ${selector} .avatar {\n`;
+        css += `    display: none !important;\n`;
+        css += `}\n\n`;
     } else {
         // Moonlit Echoes Mode: Dynamic Styling for .mes_block
         // This injects the USER'S accent color settings into the theme-compliant container

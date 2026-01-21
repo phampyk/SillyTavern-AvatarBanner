@@ -1,12 +1,12 @@
 {
-  "display_name": "Avatar Banner",
+  "display_name": "Avatar Banner TEST",
   "loading_order": 100,
   "requires": [],
   "optional": [],
   "js": "index.js",
   "css": "style.css",
   "author": "Kaede",
-  "version": "4.1",
+  "version": "3.3.3-modular",
   "homePage": "https://github.com/SillyTavern/Extension-AvatarBanner",
   "auto_update": false
 }
