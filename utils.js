@@ -97,6 +97,9 @@ export function hexToRgb(color) {
     if (!color || typeof color !== 'string') {
         return { r: 231, g: 159, b: 168 };
     }
+    
+    // Clean whitespace
+    color = color.trim();
 
     // Handle rgb/rgba strings
     if (color.startsWith('rgb')) {
