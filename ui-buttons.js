@@ -103,8 +103,20 @@ export function reloadPersonaPickers() {
         const p1 = document.getElementById('persona_banner_custom_accent');
         const p2 = document.getElementById('persona_banner_custom_quote');
         if (p1 && p2) {
-            const accentVal = p1.parentNode.dataset.isDefault === 'true' ? null : p1.hex;
-            const quoteVal = p2.parentNode.dataset.isDefault === 'true' ? null : p2.hex;
+            // Strict check: if it matches global default, FORCE inheritance (null)
+            const settings = getSettings();
+            const currentGlobalAccent = settings.accentColor || '#e79fa8';
+            const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+
+            let accentVal = p1.hex;
+            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && accentVal.toLowerCase() === currentGlobalAccent.toLowerCase())) {
+                accentVal = null;
+            }
+
+            let quoteVal = p2.hex;
+            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && quoteVal.toLowerCase() === currentGlobalQuote.toLowerCase())) {
+                quoteVal = null;
+            }
 
             saveUserColors(ua, accentVal, quoteVal);
             applyBannersToChat();
@@ -284,8 +296,20 @@ export async function addCharacterEditorButton() {
         const p2 = document.getElementById('character_banner_custom_quote');
         if (p1 && p2) {
             // Check for default state (inheritance)
-            const accentVal = p1.parentNode.dataset.isDefault === 'true' ? null : p1.hex;
-            const quoteVal = p2.parentNode.dataset.isDefault === 'true' ? null : p2.hex;
+            // Strict check: if it matches global default, FORCE inheritance (null)
+            const settings = getSettings();
+            const currentGlobalAccent = settings.accentColor || '#e79fa8';
+            const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+            
+            let accentVal = p1.hex;
+            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && accentVal.toLowerCase() === currentGlobalAccent.toLowerCase())) {
+                accentVal = null;
+            }
+            
+            let quoteVal = p2.hex;
+            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && quoteVal.toLowerCase() === currentGlobalQuote.toLowerCase())) {
+                quoteVal = null;
+            }
             
             await saveCharacterColors(cid, accentVal, quoteVal);
             applyBannersToChat();
