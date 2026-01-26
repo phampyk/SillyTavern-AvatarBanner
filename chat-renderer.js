@@ -1,10 +1,6 @@
-/**
- * Avatar Banner Extension - Chat Renderer
- */
-import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCharacterIdByName, getCurrentUserAvatar, escapeCSS, isMoonlitTheme, escapeHtml } from './utils.js';
-import { getCharacterBanner, getUserBanner, createBannerElement } from './banner-manager.js';
-import { getDynamicStyleElement, generateExtraStylingCSS } from './css-generator.js';
-import { getGoogleFontImport, preloadGoogleFont } from './fonts.js';
+import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCharacterIdByName, getCurrentUserAvatar, isMoonlitTheme, hexToRgb } from './utils.js';
+import { getCharacterBanner, getUserBanner, createBannerElement, getCharacterData, getUserData } from './banner-manager.js';
+import { getGoogleFontImport, preloadGoogleFont, getDynamicStyleElement, getFontFamilyName } from './fonts.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
@@ -14,6 +10,98 @@ let ExtensionState;
 export function initChatRenderer(getSettingsFn, extensionState) {
     getSettings = getSettingsFn;
     ExtensionState = extensionState;
+}
+
+// Set CSS variables on a message element for styling
+function setMessageCSSVariables(messageElement, settings, customAccentColor, customQuoteColor) {
+    if (!messageElement || !settings) return;
+    
+    const accent = customAccentColor || settings.accentColor;
+    const rgb = hexToRgb(accent);
+    
+    const parsedFontName = getFontFamilyName(settings.fontFamily);
+    const fontFamily = parsedFontName ? `"${parsedFontName}", cursive` : '"Caveat", cursive';
+    
+    messageElement.style.setProperty('--banner-height', `${settings.bannerHeight}vh`);
+    messageElement.style.setProperty('--banner-font-size', `${settings.fontSize}rem`);
+    messageElement.style.setProperty('--banner-name-padding-tb', `${settings.namePaddingTB}em`);
+    messageElement.style.setProperty('--banner-name-padding-lr', `${settings.namePaddingLR}em`);
+    if (rgb) {
+        messageElement.style.setProperty('--banner-accent-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
+    }
+    messageElement.style.setProperty('--banner-font-family', fontFamily);
+
+    if (customQuoteColor) {
+        // Override the global SmartThemeQuoteColor for this message
+        messageElement.style.setProperty('--SmartThemeQuoteColor', customQuoteColor);
+    } else {
+        // No custom quote color - remove any previous override to inherit from theme
+        messageElement.style.removeProperty('--SmartThemeQuoteColor');
+    }
+}
+
+// Update panel banner (standard theme only)
+async function updatePanelBanner() {
+    const settings = getSettings();
+    const isMoonlit = isMoonlitTheme(settings);
+    
+    // Remove panel banner class and variable if disabled, Moonlit, or group chat
+    if (!settings.enablePanelBanner || isMoonlit || isGroupChat()) {
+        document.body.classList.remove('has-panel-banner');
+        document.body.style.removeProperty('--panel-banner-url');
+        return;
+    }
+    
+    const context = SillyTavern.getContext();
+    const currentCharId = context.characterId;
+    
+    if (currentCharId === undefined) {
+        document.body.classList.remove('has-panel-banner');
+        document.body.style.removeProperty('--panel-banner-url');
+        return;
+    }
+    
+    const banner = await getCharacterBanner(currentCharId);
+    
+    if (banner) {
+        const safeUrl = banner.replace(/"/g, '\\"').replace(/\n/g, '').replace(/\r/g, '');
+        document.body.style.setProperty('--panel-banner-url', `url("${safeUrl}")`);
+        document.body.classList.add('has-panel-banner');
+    } else {
+        document.body.classList.remove('has-panel-banner');
+        document.body.style.removeProperty('--panel-banner-url');
+    }
+}
+
+// Update panel banner (Moonlit Echoes only)
+async function updatePanelBannerMoonlit() {
+    const settings = getSettings();
+    const isMoonlit = isMoonlitTheme(settings);
+    
+    // Remove panel banner class if disabled, not Moonlit, or group chat
+    if (!settings.enablePanelBanner || !isMoonlit || isGroupChat()) {
+        document.body.classList.remove('has-panel-banner-moonlit');
+        return;
+    }
+    
+    const context = SillyTavern.getContext();
+    const currentCharId = context.characterId;
+    
+    if (currentCharId === undefined) {
+        document.body.classList.remove('has-panel-banner-moonlit');
+        return;
+    }
+    
+    const banner = await getCharacterBanner(currentCharId);
+    
+    if (banner) {
+        // Use same variable as standard
+        const safeUrl = banner.replace(/"/g, '\\"').replace(/\n/g, '').replace(/\r/g, '');
+        document.body.style.setProperty('--panel-banner-url', `url("${safeUrl}")`);
+        document.body.classList.add('has-panel-banner-moonlit');
+    } else {
+        document.body.classList.remove('has-panel-banner-moonlit');
+    }
 }
 
 export async function updateDynamicCSS() {
@@ -27,8 +115,6 @@ export async function updateDynamicCSS() {
         }
         
         const context = SillyTavern.getContext();
-        const inGroupChat = isGroupChat();
-        
         const isMoonlit = isMoonlitTheme(settings);
         
         if (isMoonlit) {
@@ -42,183 +128,13 @@ export async function updateDynamicCSS() {
         }
         
         let css = '';
-        const paddingTop = Math.max(settings.bannerHeight - 30, 50);
-        const paddingTopMobile = Math.max(Math.round(settings.bannerHeight * 0.48 - 10), 20);
-        const paddingBottom = 15;
-        const paddingBottomMobile = 10;
         
-        let anyCharacterHasBanner = false;
-        let charactersToProcess = [];
-        
-        if (inGroupChat) {
-            const group = getCurrentGroup();
-            if (group && group.members) {
-                for (const memberAvatar of group.members) {
-                    const charId = getCharacterIdByAvatar(memberAvatar);
-                    if (charId !== undefined && charId >= 0) {
-                        const character = context.characters[charId];
-                        if (character) {
-                            charactersToProcess.push({
-                                id: charId,
-                                name: character.name,
-                                avatar: character.avatar
-                            });
-                        }
-                    }
-                }
-            }
-        } else {
-            const currentCharId = context.characterId;
-            if (currentCharId !== undefined) {
-                const character = context.characters?.[currentCharId];
-                if (character) {
-                    charactersToProcess.push({
-                        id: currentCharId,
-                        name: character.name,
-                        avatar: character.avatar
-                    });
-                }
-            }
+        // Only dynamic CSS needed is for Google Font loading
+        if (settings.extraStylingEnabled && settings.fontFamily) {
+            preloadGoogleFont(settings.fontFamily, false, ExtensionState);
+            css = getGoogleFontImport(settings.fontFamily);
         }
-        
-        let fontImportAdded = false;
-        // isMoonlit is already declared above
 
-        for (const charInfo of charactersToProcess) {
-            const banner = await getCharacterBanner(charInfo.id);
-            const hasBanner = !!banner;
-            
-            if (hasBanner) {
-                anyCharacterHasBanner = true;
-                
-                if (!fontImportAdded && settings.extraStylingEnabled && settings.fontFamily) {
-                    preloadGoogleFont(settings.fontFamily, false, ExtensionState);
-                    css += getGoogleFontImport(settings.fontFamily) + '\n\n';
-                    fontImportAdded = true;
-                }
-            }
-            
-            const character = context.characters[charInfo.id];
-            const nameForSelector = character?._originalName || character?.name || charInfo.name;
-            const escapedName = escapeCSS(nameForSelector);
-            
-            let displayName = character?.name || charInfo.name;
-            if (character?.data?.extensions?.['chat-name']?.chatName) {
-                const chatName = character.data.extensions['chat-name'].chatName.trim();
-                if (chatName) {
-                    displayName = chatName;
-                }
-            }
-            
-            if (isMoonlit) {
-                if (hasBanner) {
-                    css += `#chat .mes[ch_name="${escapedName}"].moonlit-banner .mes_block {\n`;
-                    css += `    padding-top: ${paddingTop}px !important;\n`;
-                    css += `}\n`;
-                    css += `@media screen and (max-width: 768px) {\n`;
-                    css += `    #chat .mes[ch_name="${escapedName}"].moonlit-banner .mes_block {\n`;
-                    css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-                    css += `    }\n`;
-                    css += `}\n`;
-                    
-                    if (settings.extraStylingEnabled) {
-                        css += generateExtraStylingCSS(nameForSelector, false, settings, displayName, isMoonlit);
-                    }
-                }
-            } else {
-                if (hasBanner || settings.extraStylingEnabled) {
-                    if (hasBanner) {
-                        css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
-                        css += `    display: none !important;\n`;
-                        css += `}\n`;
-                        
-                        if (!settings.extraStylingEnabled) {
-                            css += `#chat .mes[ch_name="${escapedName}"] {\n`;
-                            css += `    padding: ${paddingTop}px 25px ${paddingBottom}px !important;\n`;
-                            css += `}\n`;
-                            css += `@media screen and (max-width: 768px) {\n`;
-                            css += `    #chat .mes[ch_name="${escapedName}"] {\n`;
-                            css += `        padding: ${paddingTopMobile}px 15px ${paddingBottomMobile}px !important;\n`;
-                            css += `    }\n`;
-                            css += `}\n`;
-                        }
-                    }
-
-                    if (settings.extraStylingEnabled) {
-                        css += generateExtraStylingCSS(nameForSelector, false, settings, displayName, isMoonlit);
-                    }
-                } else {
-                    css += `.mes[ch_name="${escapedName}"] .avatar {\n`;
-                    css += `    display: flex !important;\n`;
-                    css += `    visibility: visible !important;\n`;
-                    css += `}\n\n`;
-                }
-            }
-        }
-        
-        if (anyCharacterHasBanner && (settings.enableUserBanners || settings.extraStylingEnabled)) {
-            if (isMoonlit) {
-                if (settings.enableUserBanners) {
-                     css += `html body #chat .mes[is_user="true"].moonlit-banner .mes_block,\n`;
-                     css += `#chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
-                     css += `    padding-top: ${paddingTop}px !important;\n`;
-                     css += `}\n`;
-                     css += `@media screen and (max-width: 768px) {\n`;
-                     css += `    html body #chat .mes[is_user="true"].moonlit-banner .mes_block,\n`;
-                     css += `    #chat .mes[is_user="true"].moonlit-banner .mes_block {\n`;
-                     css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-                     css += `    }\n`;
-                     css += `}\n`;
-                }
-                
-                if (settings.extraStylingEnabled) {
-                    css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
-                }
-            } else {
-                if (settings.enableUserBanners) {
-                    css += `.mes[is_user="true"] .avatar {\n`;
-                    css += `    display: none !important;\n`;
-                    css += `}\n`;
-                    
-                    css += `.mes[is_user="true"] .ch_name,\n`;
-                    css += `.mes[is_user="true"] .mes_block {\n`;
-                    css += `    overflow: visible !important;\n`;
-                    css += `}\n`;
-                    
-                    css += `.mes[is_user="true"] .ch_name > .flex-container > .flex-container.alignItemsBaseline {\n`;
-                    css += `    flex-wrap: wrap !important;\n`;
-                    css += `}\n`;
-                    css += `.mes[is_user="true"] .ch_name .name_text {\n`;
-                    css += `    flex-basis: 100% !important;\n`;
-                    css += `}\n`;
-                    
-                    if (!settings.extraStylingEnabled) {
-                        css += `#chat .mes[is_user="true"].has-avatar-banner {\n`;
-                        css += `    padding: ${paddingTop}px 25px ${paddingBottom}px !important;\n`;
-                        css += `}\n`;
-                        css += `@media screen and (max-width: 768px) {\n`;
-                        css += `    #chat .mes[is_user="true"].has-avatar-banner {\n`;
-                        css += `        padding: ${paddingTopMobile}px 15px ${paddingBottomMobile}px !important;\n`;
-                        css += `    }\n`;
-                        css += `}\n`;
-                    }
-                }
-                
-                if (settings.extraStylingEnabled) {
-                    css += generateExtraStylingCSS(null, true, settings, null, isMoonlit);
-                }
-            }
-            css += `\n`;
-        }
-        
-        const mobileHeight = Math.round(settings.bannerHeight * 0.65);
-        css += `@media screen and (max-width: 768px) {\n`;
-        css += `    .avatar-banner {\n`;
-        css += `        --banner-height: ${mobileHeight}px !important;\n`;
-        css += `        height: var(--banner-height) !important;\n`;
-        css += `    }\n`;
-        css += `}\n`;
-        
         styleEl.textContent = css;
     } catch (error) {
         console.error(`[${extensionName}]`, 'Error updating dynamic CSS:', error);
@@ -247,6 +163,8 @@ export async function applyBannersToChat() {
         }
         
         await updateDynamicCSS();
+        await updatePanelBanner();
+        await updatePanelBannerMoonlit();
         
         if (!settings.enabled) {
             document.querySelectorAll('.avatar-banner').forEach(el => el.remove());
@@ -259,7 +177,8 @@ export async function applyBannersToChat() {
         const messages = document.querySelectorAll('.mes');
         const inGroupChat = isGroupChat();
         
-        const bannerCache = new Map();
+        // Cache now stores the full data object { banner, accentColor, quoteColor }
+        const charDataCache = new Map();
         const characterInfoCache = new Map();
         
         if (inGroupChat) {
@@ -270,7 +189,7 @@ export async function applyBannersToChat() {
                     if (charId !== undefined && charId >= 0) {
                         const character = context.characters[charId];
                         if (character) {
-                            const banner = await getCharacterBanner(charId);
+                            const data = await getCharacterData(charId);
                             const nameForLookup = character._originalName || character.name;
                             
                             let displayName = character.name;
@@ -281,7 +200,7 @@ export async function applyBannersToChat() {
                                 }
                             }
                             
-                            bannerCache.set(nameForLookup, banner);
+                            charDataCache.set(nameForLookup, data);
                             characterInfoCache.set(nameForLookup, {
                                 id: charId,
                                 displayName: displayName,
@@ -289,7 +208,7 @@ export async function applyBannersToChat() {
                             });
                             
                             if (character._originalName) {
-                                bannerCache.set(character.name, banner);
+                                charDataCache.set(character.name, data);
                                 characterInfoCache.set(character.name, {
                                     id: charId,
                                     displayName: displayName,
@@ -305,7 +224,7 @@ export async function applyBannersToChat() {
             if (currentCharId !== undefined) {
                 const character = context.characters?.[currentCharId];
                 if (character) {
-                    const banner = await getCharacterBanner(currentCharId);
+                    const data = await getCharacterData(currentCharId);
                     const nameForLookup = character._originalName || character.name;
                     
                     let displayName = character.name;
@@ -316,7 +235,7 @@ export async function applyBannersToChat() {
                         }
                     }
                     
-                    bannerCache.set(nameForLookup, banner);
+                    charDataCache.set(nameForLookup, data);
                     characterInfoCache.set(nameForLookup, {
                         id: currentCharId,
                         displayName: displayName,
@@ -324,7 +243,7 @@ export async function applyBannersToChat() {
                     });
                     
                     if (character._originalName) {
-                        bannerCache.set(character.name, banner);
+                        charDataCache.set(character.name, data);
                         characterInfoCache.set(character.name, {
                             id: currentCharId,
                             displayName: displayName,
@@ -335,7 +254,7 @@ export async function applyBannersToChat() {
             }
         }
         
-        const anyCharacterHasBanner = Array.from(bannerCache.values()).some(b => !!b);
+        const anyCharacterHasBanner = Array.from(charDataCache.values()).some(d => !!d.banner);
         
         messages.forEach(mes => {
             const existingBanner = mes.querySelector('.avatar-banner');
@@ -354,6 +273,8 @@ export async function applyBannersToChat() {
             }
             
             let bannerDataUrl = null;
+            let customAccent = null;
+            let customQuote = null;
             
             if (isUser) {
                 const forceAvatar = mes.getAttribute('force_avatar');
@@ -365,19 +286,31 @@ export async function applyBannersToChat() {
                 }
                 
                 if (userAvatarPath) {
-                    bannerDataUrl = getUserBanner(userAvatarPath);
+                    // getUserData returns object { banner, accentColor, quoteColor, ... }
+                    const userData = getUserData(userAvatarPath);
+                    bannerDataUrl = userData.banner;
+                    customAccent = userData.accentColor;
+                    customQuote = userData.quoteColor;
                 }
             } else {
                 const charName = mes.getAttribute('ch_name');
                 if (charName) {
-                    if (bannerCache.has(charName)) {
-                        bannerDataUrl = bannerCache.get(charName);
+                    if (charDataCache.has(charName)) {
+                        const data = charDataCache.get(charName);
+                        bannerDataUrl = data.banner;
+                        customAccent = data.accentColor;
+                        customQuote = data.quoteColor;
                     } else {
+                        // Fallback logic for characters not in cache ? (maybe new ones)
                         const charId = getCharacterIdByName(charName);
                         if (charId !== undefined && charId >= 0) {
                             const character = context.characters[charId];
-                            bannerDataUrl = character?.data?.extensions?.[extensionName]?.banner || null;
-                            bannerCache.set(charName, bannerDataUrl);
+                            const data = character?.data?.extensions?.[extensionName] || {};
+                            bannerDataUrl = data.banner || null;
+                            customAccent = data.accentColor;
+                            customQuote = data.quoteColor;
+
+                            charDataCache.set(charName, data);
                             
                             if (!characterInfoCache.has(charName)) {
                                 characterInfoCache.set(charName, {
@@ -409,9 +342,14 @@ export async function applyBannersToChat() {
                 }
             }
             
+            // Set CSS variables on the message element - always set when banner exists
+            if (bannerDataUrl || settings.extraStylingEnabled) {
+                setMessageCSSVariables(mes, settings, customAccent, customQuote);
+            }
+            
             if (bannerDataUrl && (!isUser || settings.enableUserBanners)) {
                 const isMoonlit = isMoonlitTheme(settings);
-                const banner = createBannerElement(bannerDataUrl, settings.bannerHeight, mes, isMoonlit);
+                const banner = createBannerElement(bannerDataUrl, isMoonlit);
                 
                 if (isMoonlit) {
                     const mesBlock = mes.querySelector('.mes_block');
@@ -431,10 +369,13 @@ export async function applyBannersToChat() {
                 }
             } else {
                 const isMoonlit = isMoonlitTheme(settings);
-                const persistStyling = isUser && isMoonlit && settings.extraStylingEnabled;
+                const persistStyling = isUser && settings.extraStylingEnabled;
                 
                 if (persistStyling) {
-                    mes.classList.add('has-avatar-banner', 'moonlit-banner');
+                    mes.classList.add('has-avatar-banner');
+                    if (isMoonlit) {
+                        mes.classList.add('moonlit-banner');
+                    }
                 } else {
                     mes.classList.remove('has-avatar-banner', 'moonlit-banner');
                 }
