@@ -22,68 +22,39 @@ export function initUIButtons(applyBannersFn, extensionState, getSettingsFn, eve
 // Reload character pickers with fresh defaults
 export async function reloadCharacterPickers() {
     const container = document.getElementById('avatar_banner_controls');
-    if (!container) return; // Panel not open
+    if (!container) return;
     
     const context = SillyTavern.getContext();
     const characterId = context.characterId;
     if (characterId === undefined) return;
     
-    // Get current data
     const data = await getCharacterData(characterId);
     const settings = getSettings();
     const defaultAccent = settings.accentColor;
     const defaultQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
     
+    console.log('[AvatarBanner] Reloading pickers with defaults:', { defaultAccent, defaultQuote });
+    
     // Find existing pickers
-    const accentPicker = document.getElementById('character_banner_custom_accent');
     const quotePicker = document.getElementById('character_banner_custom_quote');
     
-    // If pickers exist, update their colors if they're inheriting defaults
-    if (accentPicker && quotePicker) {
-        const accentRow = accentPicker.closest('.flex-container');
+    if (quotePicker) {
         const quoteRow = quotePicker.closest('.flex-container');
+        console.log('[AvatarBanner] Found quote picker, isDefault =', quoteRow?.dataset.isDefault);
         
-        // Update accent picker's stored default
-        accentPicker.dataset.defaultColor = defaultAccent;
+        // ALWAYS update the picker to test if the update mechanism works
+        quotePicker.setAttribute('color', defaultQuote);
+        quotePicker.color = defaultQuote;
         
-        // Update accent picker if inheriting default
-        if (accentRow && accentRow.dataset.isDefault === 'true') {
-            accentPicker.setAttribute('color', defaultAccent);
-            if (accentPicker.color !== defaultAccent) {
-                accentPicker.color = defaultAccent;
-            }
-            requestAnimationFrame(() => {
-                if (accentPicker.color !== defaultAccent) {
-                    accentPicker.color = defaultAccent;
-                }
-            });
-        }
+        requestAnimationFrame(() => {
+            quotePicker.color = defaultQuote;
+            console.log('[AvatarBanner] Updated quote picker to:', defaultQuote);
+        });
         
-        // Update quote picker's stored default
-        quotePicker.dataset.defaultColor = defaultQuote;
-        
-        // Update quote picker if inheriting default
-        if (quoteRow && quoteRow.dataset.isDefault === 'true') {
-            quotePicker.setAttribute('color', defaultQuote);
-            if (quotePicker.color !== defaultQuote) {
-                quotePicker.color = defaultQuote;
-            }
-            requestAnimationFrame(() => {
-                if (quotePicker.color !== defaultQuote) {
-                    quotePicker.color = defaultQuote;
-                }
-            });
-        }
-        
-        return; // Pickers updated, no need to recreate
+        return;
     }
     
-    // If pickers don't exist, create them (first time initialization)
-    // Find and remove old picker rows (shouldn't happen, but just in case)
-    const oldPicker1 = document.getElementById('character_banner_custom_accent');
-    const oldPicker2 = document.getElementById('character_banner_custom_quote');
-    oldPicker1?.closest('.flex-container')?.remove();
-    oldPicker2?.closest('.flex-container')?.remove();
+    console.log('[AvatarBanner] No existing pickers found, creating new ones');
     
     // Create save handler
     const saveColors = async () => {
@@ -101,7 +72,6 @@ export async function reloadCharacterPickers() {
         }
     };
     
-    // Create new picker rows with updated defaults
     const { row: row1 } = createPickerRow('character_banner_custom_accent', 'Accent color', data.accentColor, defaultAccent, saveColors);
     const { row: row2 } = createPickerRow('character_banner_custom_quote', 'Quote color', data.quoteColor, defaultQuote, saveColors);
     

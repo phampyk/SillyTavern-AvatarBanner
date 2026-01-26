@@ -106,7 +106,10 @@ function setupMutationObserver() {
                     if (mutation.target === document.documentElement && mutation.attributeName === 'style') {
                         // Check if the quote color actually changed to avoid spam
                         const currentQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+                        console.log('[AvatarBanner] Style mutation detected, currentQuote:', currentQuote, 'lastKnown:', ExtensionState.lastKnownQuoteColor);
+                        
                         if (currentQuote && currentQuote !== ExtensionState.lastKnownQuoteColor) {
+                            console.log('[AvatarBanner] Quote color CHANGED! Updating pickers...');
                             ExtensionState.lastKnownQuoteColor = currentQuote;
                             
                             // Debounce updates to avoid multiple rapid calls
@@ -122,10 +125,14 @@ function setupMutationObserver() {
                                     const charControls = document.getElementById('avatar_banner_controls');
                                     const personaControls = document.getElementById('persona_banner_controls');
                                     
+                                    console.log('[AvatarBanner] Checking for open pickers:', { charControls: !!charControls, personaControls: !!personaControls });
+                                    
                                     if (charControls) {
+                                        console.log('[AvatarBanner] Calling reloadCharacterPickers...');
                                         reloadCharacterPickers();
                                     }
                                     if (personaControls) {
+                                        console.log('[AvatarBanner] Calling reloadPersonaPickers...');
                                         reloadPersonaPickers();
                                     }
                                 });
