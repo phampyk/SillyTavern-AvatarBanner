@@ -223,10 +223,10 @@ async function handleUploadClick(avatarPath, displayName, isUser, characterId = 
         // Let's build a custom prompt logic.
         const d = document.createElement('div');
         d.innerHTML = `
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-                <button id="ab_recrop_btn" class="menu_button">Recrop Existing Image</button>
-                <button id="ab_upload_new_btn" class="menu_button">Upload New Image</button>
-                <button id="ab_delete_custom_btn" class="menu_button fa-solid fa-trash-can" style="color: var(--smart-theme-color-red);"> Remove Custom Image</button>
+            <div class="avatar-banner-popup-menu">
+                <div id="ab_recrop_btn" class="menu_button">Recrop Existing Image</div>
+                <div id="ab_upload_new_btn" class="menu_button">Upload New Image</div>
+                <div id="ab_delete_custom_btn" class="menu_button fa-solid fa-trash-can avatar-banner-delete-btn"> Remove Custom Image</div>
             </div>
         `;
         
