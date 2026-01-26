@@ -132,3 +132,18 @@ export function isMoonlitTheme(settings) {
     const hasMoonlitStyle = !!document.getElementById('MoonlitEchosTheme-style');
     return hasMoonlitClass || hasMoonlitStyle;
 }
+
+// Robust color comparison
+export function areColorsEqual(color1, color2) {
+    if (!color1 || !color2) return false;
+    
+    const rgb1 = hexToRgb(color1);
+    const rgb2 = hexToRgb(color2);
+    
+    // Check if conversion succeeded
+    if (!rgb1 || !rgb2) return false;
+    
+    return Math.abs(rgb1.r - rgb2.r) < 3 &&
+           Math.abs(rgb1.g - rgb2.g) < 3 &&
+           Math.abs(rgb1.b - rgb2.b) < 3;
+}
