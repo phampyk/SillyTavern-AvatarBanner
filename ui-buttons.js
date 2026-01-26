@@ -363,7 +363,7 @@ export async function addCharacterEditorButton() {
     const button = document.createElement('div');
     button.id = 'avatar_banner_button';
     button.className = 'menu_button fa-solid fa-panorama interactable';
-    button.style.flex = '1';
+    button.style.flex = '0';
     button.title = 'Configure Avatar Banner';
     
     button.onclick = async (e) => {
