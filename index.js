@@ -2,7 +2,7 @@ import { eventSource, event_types, saveSettingsDebounced } from '../../../../scr
 import { extension_settings } from '../../../extensions.js';
 
 import { createSettingsPanel } from './ui-settings.js';
-import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons } from './ui-buttons.js';
+import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons, reloadCharacterPickers, reloadPersonaPickers } from './ui-buttons.js';
 import { applyBannersToChat, initChatRenderer } from './chat-renderer.js';
 import { initBannerManager } from './banner-manager.js';
 
@@ -118,20 +118,18 @@ function setupMutationObserver() {
                                 requestAnimationFrame(() => {
                                     applyBannersToChat();
                                     
-                                    // Only reload pickers if they exist and are visible
+                                    // Reload pickers if they're visible
                                     const charControls = document.getElementById('avatar_banner_controls');
                                     const personaControls = document.getElementById('persona_banner_controls');
                                     
                                     if (charControls) {
-                                        const reloadChar = require('./ui-buttons.js').reloadCharacterPickers;
-                                        if (reloadChar) reloadChar();
+                                        reloadCharacterPickers();
                                     }
                                     if (personaControls) {
-                                        const reloadPersona = require('./ui-buttons.js').reloadPersonaPickers;
-                                        if (reloadPersona) reloadPersona();
+                                        reloadPersonaPickers();
                                     }
                                 });
-                            }, 100); // Debounce by 100ms to avoid multiple rapid updates
+                            }, 100);
                         }
                     }
 

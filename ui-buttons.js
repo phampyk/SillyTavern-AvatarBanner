@@ -317,18 +317,31 @@ function createPickerRow(id, labelText, color, defaultColor, onChangeCallback) {
     resetBtn.addEventListener('click', () => {
         row.dataset.isDefault = 'true';
         
-        // Use setAttribute and property update for compatibility
-        picker.setAttribute('color', safeDefault);
-        if (picker.color !== safeDefault) {
-            picker.color = safeDefault;
+        // Get the CURRENT default color (not the old one from closure)
+        // For accent, get from settings. For quote, get from computed style
+        let currentDefault;
+        if (id.includes('accent')) {
+            const settings = getSettings();
+            currentDefault = settings.accentColor || '#e79fa8';
+        } else {
+            currentDefault = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim() || '#e79fa8';
         }
         
-        // Force a visual update with requestAnimationFrame
+        // Update picker with current default
+        picker.setAttribute('color', currentDefault);
+        if (picker.color !== currentDefault) {
+            picker.color = currentDefault;
+        }
+        
+        // Force visual update
         requestAnimationFrame(() => {
-            if (picker.color !== safeDefault) {
-                picker.color = safeDefault;
+            if (picker.color !== currentDefault) {
+                picker.color = currentDefault;
             }
         });
+        
+        // Update stored default
+        picker.dataset.defaultColor = currentDefault;
         
         onChangeCallback();
     });
