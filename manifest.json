@@ -5,8 +5,8 @@
   "optional": [],
   "js": "index.js",
   "css": "style.css",
-  "author": "phampyk",
-  "version": "5.0beta",
+  "author": "Kaede",
+  "version": "4.1",
   "homePage": "https://github.com/SillyTavern/Extension-AvatarBanner",
   "auto_update": false
 }
