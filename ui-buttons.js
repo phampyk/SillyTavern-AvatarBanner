@@ -1,4 +1,4 @@
-import { getCurrentCharacterAvatar, getPersonaImageUrlFullRes, escapeHtml } from './utils.js';
+import { getCurrentCharacterAvatar, getPersonaImageUrlFullRes, escapeHtml, areColorsEqual } from './utils.js';
 import { getCharacterBanner, saveCharacterBanner, removeCharacterBanner, getUserBanner, saveUserBanner, removeUserBanner, getCharacterData, getUserData, saveCharacterColors, saveUserColors } from './banner-manager.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
@@ -19,7 +19,10 @@ export function initUIButtons(applyBannersFn, extensionState, getSettingsFn, eve
     setTimeout(() => {
         const quoteColorPicker = document.getElementById('quote-color-picker');
         if (quoteColorPicker) {
-            quoteColorPicker.addEventListener('change', () => {
+            // Track the 'current' color as 'last' initially
+            let lastKnownQuoteColor = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+
+            quoteColorPicker.addEventListener('change', async () => {
                 // Quote color changed - re-render chat instantly
                 applyBannersToChat();
                 // Also reload pickers if they're open
@@ -303,7 +306,7 @@ export async function addCharacterEditorButton() {
             
             let accentVal = p1.hex;
             if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && accentVal.toLowerCase() === currentGlobalAccent.toLowerCase())) {
-                accentVal = null;
+               accentVal = null;
             }
             
             let quoteVal = p2.hex;

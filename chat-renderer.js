@@ -344,17 +344,6 @@ export async function applyBannersToChat() {
             
             // Set CSS variables on the message element - always set when banner exists
             if (bannerDataUrl || settings.extraStylingEnabled) {
-                // Render-time strict inheritance: if custom colors match global defaults, ignore them
-                const currentGlobalAccent = settings.accentColor || '#e79fa8';
-                const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
-
-                if (areColorsEqual(customAccent, currentGlobalAccent)) {
-                    customAccent = null;
-                }
-                if (areColorsEqual(customQuote, currentGlobalQuote)) {
-                    customQuote = null;
-                }
-
                 setMessageCSSVariables(mes, settings, customAccent, customQuote);
             }
             
