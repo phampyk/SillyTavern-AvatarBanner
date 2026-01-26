@@ -2,7 +2,7 @@ import { eventSource, event_types, saveSettingsDebounced } from '../../../../scr
 import { extension_settings } from '../../../extensions.js';
 
 import { createSettingsPanel } from './ui-settings.js';
-import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons, reloadCharacterPickers, reloadPersonaPickers } from './ui-buttons.js';
+import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons } from './ui-buttons.js';
 import { applyBannersToChat, initChatRenderer } from './chat-renderer.js';
 import { initBannerManager } from './banner-manager.js';
 
@@ -15,8 +15,6 @@ const ExtensionState = {
     currentLoadedFont: null,
     charClickHandlerBound: false,
     personaClickHandlerBound: false,
-    lastKnownQuoteColor: '', // Track for observer
-    themeUpdateTimeout: null, // Debounce timer for theme changes
 };
 
 const defaultSettings = {
@@ -102,44 +100,6 @@ function setupMutationObserver() {
         try {
             for (const mutation of mutations) {
                 if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                    // Check for Theme Color Changes on Root
-                    if (mutation.target === document.documentElement && mutation.attributeName === 'style') {
-                        // Check if the quote color actually changed to avoid spam
-                        const currentQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
-                        console.log('[AvatarBanner] Style mutation detected, currentQuote:', currentQuote, 'lastKnown:', ExtensionState.lastKnownQuoteColor);
-                        
-                        if (currentQuote && currentQuote !== ExtensionState.lastKnownQuoteColor) {
-                            console.log('[AvatarBanner] Quote color CHANGED! Updating pickers...');
-                            ExtensionState.lastKnownQuoteColor = currentQuote;
-                            
-                            // Debounce updates to avoid multiple rapid calls
-                            if (ExtensionState.themeUpdateTimeout) {
-                                clearTimeout(ExtensionState.themeUpdateTimeout);
-                            }
-                            
-                            ExtensionState.themeUpdateTimeout = setTimeout(() => {
-                                requestAnimationFrame(() => {
-                                    applyBannersToChat();
-                                    
-                                    // Reload pickers if they're visible
-                                    const charControls = document.getElementById('avatar_banner_controls');
-                                    const personaControls = document.getElementById('persona_banner_controls');
-                                    
-                                    console.log('[AvatarBanner] Checking for open pickers:', { charControls: !!charControls, personaControls: !!personaControls });
-                                    
-                                    if (charControls) {
-                                        console.log('[AvatarBanner] Calling reloadCharacterPickers...');
-                                        reloadCharacterPickers();
-                                    }
-                                    if (personaControls) {
-                                        console.log('[AvatarBanner] Calling reloadPersonaPickers...');
-                                        reloadPersonaPickers();
-                                    }
-                                });
-                            }, 100);
-                        }
-                    }
-
                     const characterPopup = document.getElementById('character_popup');
                     if (characterPopup && characterPopup.style.display !== 'none') {
                         addCharacterEditorButton();
@@ -161,7 +121,6 @@ function setupMutationObserver() {
         const characterPopup = document.getElementById('character_popup');
         const personaButton = document.getElementById('persona-management-button');
         
-        // 1. Observe popups (existing logic)
         if (characterPopup) {
             observer.observe(characterPopup, {
                 childList: true,
@@ -179,14 +138,6 @@ function setupMutationObserver() {
                 subtree: true
             });
         }
-
-        // 2. Observe ROOT HTML element for Theme Changes (The "God Mode" Sync)
-        // SillyTavern updates --SmartThemeQuoteColor on the documentElement.
-        // Observing this guarantees we catch the change instantly.
-        observer.observe(document.documentElement, {
-             attributes: true,
-             attributeFilter: ['style']
-        });
     };
     
     if (document.readyState === 'loading') {
@@ -222,12 +173,6 @@ function cleanup() {
         if (ExtensionState.observer) {
             ExtensionState.observer.disconnect();
             ExtensionState.observer = null;
-        }
-
-        // Clean up theme update timeout
-        if (ExtensionState.themeUpdateTimeout) {
-            clearTimeout(ExtensionState.themeUpdateTimeout);
-            ExtensionState.themeUpdateTimeout = null;
         }
 
         const dynamicStyles = document.getElementById('avatar-banner-dynamic-styles');

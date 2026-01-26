@@ -13,48 +13,28 @@ export function initUIButtons(applyBannersFn, extensionState, getSettingsFn, eve
     applyBannersToChat = applyBannersFn;
     ExtensionState = extensionState;
     getSettings = getSettingsFn;
-    
-    applyBannersToChat = applyBannersFn;
-    ExtensionState = extensionState;
-    getSettings = getSettingsFn;
 }
 
 // Reload character pickers with fresh defaults
 export async function reloadCharacterPickers() {
     const container = document.getElementById('avatar_banner_controls');
-    if (!container) return;
+    if (!container) return; // Panel not open
     
     const context = SillyTavern.getContext();
     const characterId = context.characterId;
     if (characterId === undefined) return;
     
+    // Get current data
     const data = await getCharacterData(characterId);
     const settings = getSettings();
     const defaultAccent = settings.accentColor;
     const defaultQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
     
-    console.log('[AvatarBanner] Reloading pickers with defaults:', { defaultAccent, defaultQuote });
-    
-    // Find existing pickers
-    const quotePicker = document.getElementById('character_banner_custom_quote');
-    
-    if (quotePicker) {
-        const quoteRow = quotePicker.closest('.flex-container');
-        console.log('[AvatarBanner] Found quote picker, isDefault =', quoteRow?.dataset.isDefault);
-        
-        // ALWAYS update the picker to test if the update mechanism works
-        quotePicker.setAttribute('color', defaultQuote);
-        quotePicker.color = defaultQuote;
-        
-        requestAnimationFrame(() => {
-            quotePicker.color = defaultQuote;
-            console.log('[AvatarBanner] Updated quote picker to:', defaultQuote);
-        });
-        
-        return;
-    }
-    
-    console.log('[AvatarBanner] No existing pickers found, creating new ones');
+    // Find and remove old picker rows
+    const oldPicker1 = document.getElementById('character_banner_custom_accent');
+    const oldPicker2 = document.getElementById('character_banner_custom_quote');
+    oldPicker1?.closest('.flex-container')?.remove();
+    oldPicker2?.closest('.flex-container')?.remove();
     
     // Create save handler
     const saveColors = async () => {
@@ -64,14 +44,27 @@ export async function reloadCharacterPickers() {
         const p1 = document.getElementById('character_banner_custom_accent');
         const p2 = document.getElementById('character_banner_custom_quote');
         if (p1 && p2) {
-            const accentVal = p1.parentNode.dataset.isDefault === 'true' ? null : p1.hex;
-            const quoteVal = p2.parentNode.dataset.isDefault === 'true' ? null : p2.hex;
+            // Strict check: if it matches global default, FORCE inheritance (null)
+            const settings = getSettings();
+            const currentGlobalAccent = settings.accentColor || '#e79fa8';
+            const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+            
+            let accentVal = p1.hex;
+            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && areColorsEqual(accentVal, currentGlobalAccent))) {
+               accentVal = null;
+            }
+            
+            let quoteVal = p2.hex;
+            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && areColorsEqual(quoteVal, currentGlobalQuote))) {
+                quoteVal = null;
+            }
             
             await saveCharacterColors(cid, accentVal, quoteVal);
             applyBannersToChat();
         }
     };
     
+    // Create new picker rows with updated defaults
     const { row: row1 } = createPickerRow('character_banner_custom_accent', 'Accent color', data.accentColor, defaultAccent, saveColors);
     const { row: row2 } = createPickerRow('character_banner_custom_quote', 'Quote color', data.quoteColor, defaultQuote, saveColors);
     
@@ -93,52 +86,7 @@ export function reloadPersonaPickers() {
     const defaultAccent = settings.accentColor;
     const defaultQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
     
-    // Find existing pickers
-    const accentPicker = document.getElementById('persona_banner_custom_accent');
-    const quotePicker = document.getElementById('persona_banner_custom_quote');
-    
-    // If pickers exist, update their colors if they're inheriting defaults
-    if (accentPicker && quotePicker) {
-        const accentRow = accentPicker.closest('.flex-container');
-        const quoteRow = quotePicker.closest('.flex-container');
-        
-        // Update accent picker's stored default
-        accentPicker.dataset.defaultColor = defaultAccent;
-        
-        // Update accent picker if inheriting default
-        if (accentRow && accentRow.dataset.isDefault === 'true') {
-            accentPicker.setAttribute('color', defaultAccent);
-            if (accentPicker.color !== defaultAccent) {
-                accentPicker.color = defaultAccent;
-            }
-            requestAnimationFrame(() => {
-                if (accentPicker.color !== defaultAccent) {
-                    accentPicker.color = defaultAccent;
-                }
-            });
-        }
-        
-        // Update quote picker's stored default
-        quotePicker.dataset.defaultColor = defaultQuote;
-        
-        // Update quote picker if inheriting default
-        if (quoteRow && quoteRow.dataset.isDefault === 'true') {
-            quotePicker.setAttribute('color', defaultQuote);
-            if (quotePicker.color !== defaultQuote) {
-                quotePicker.color = defaultQuote;
-            }
-            requestAnimationFrame(() => {
-                if (quotePicker.color !== defaultQuote) {
-                    quotePicker.color = defaultQuote;
-                }
-            });
-        }
-        
-        return; // Pickers updated, no need to recreate
-    }
-    
-    // If pickers don't exist, create them (first time initialization)
-    // Find and remove old picker rows (shouldn't happen, but just in case)
+    // Find and remove old picker rows
     const oldPicker1 = document.getElementById('persona_banner_custom_accent');
     const oldPicker2 = document.getElementById('persona_banner_custom_quote');
     oldPicker1?.closest('.flex-container')?.remove();
@@ -158,12 +106,12 @@ export function reloadPersonaPickers() {
             const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
 
             let accentVal = p1.hex;
-            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && accentVal.toLowerCase() === currentGlobalAccent.toLowerCase())) {
+            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && areColorsEqual(accentVal, currentGlobalAccent))) {
                 accentVal = null;
             }
 
             let quoteVal = p2.hex;
-            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && quoteVal.toLowerCase() === currentGlobalQuote.toLowerCase())) {
+            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && areColorsEqual(quoteVal, currentGlobalQuote))) {
                 quoteVal = null;
             }
 
@@ -256,28 +204,22 @@ function createPickerRow(id, labelText, color, defaultColor, onChangeCallback) {
     const isDefault = !color || (color.toLowerCase && defaultColor.toLowerCase && color.toLowerCase() === defaultColor.toLowerCase());
     row.dataset.isDefault = isDefault ? 'true' : 'false';
     
-    // Show custom color if set, otherwise show default
-    const displayColor = color || defaultColor || '#e79fa8';
-    const safeColor = escapeHtml(displayColor);
-    const safeDefault = defaultColor || '#e79fa8';
-    const safeDefaultEscaped = escapeHtml(safeDefault);
+    const safeColor = escapeHtml(color || defaultColor || '#e79fa8');
+    const safeDefault = escapeHtml(defaultColor || '#e79fa8');
     
-    // Create picker via innerHTML like the settings panel does
+    // Create picker via innerHTML like the settings panel does (line 49 of ui-settings.js)
     row.innerHTML = `
         <toolcool-color-picker id="${id}" color="${safeColor}" popup-position="left"></toolcool-color-picker>
         <span style="opacity: 0.7">${labelText}</span>
-        <i class="fa-solid fa-arrow-rotate-right menu_button" title="Reset to default" data-default="${safeDefaultEscaped}" style="cursor: pointer; opacity: 0.6;"></i>
+        <i class="fa-solid fa-arrow-rotate-right menu_button" title="Reset to default" data-default="${safeDefault}" style="cursor: pointer; opacity: 0.6;"></i>
     `;
     
     const picker = row.querySelector('toolcool-color-picker');
     const resetBtn = row.querySelector('i');
     
-    // Store the unescaped default for later use
-    picker.dataset.defaultColor = safeDefault;
-    
     picker.addEventListener('change', () => {
         // If user manually picks the default color, treat it as inheriting default
-        const currentHex = picker.hex || picker.color;
+        const currentHex = picker.hex || picker.color; // toolcool picker property
         const movesToDefault = currentHex && defaultColor && currentHex.toLowerCase() === defaultColor.toLowerCase();
         row.dataset.isDefault = movesToDefault ? 'true' : 'false';
         onChangeCallback();
@@ -286,32 +228,13 @@ function createPickerRow(id, labelText, color, defaultColor, onChangeCallback) {
     // Reset button handler
     resetBtn.addEventListener('click', () => {
         row.dataset.isDefault = 'true';
+        picker.setAttribute('color', safeDefault);
         
-        // Get the CURRENT default color (not the old one from closure)
-        // For accent, get from settings. For quote, get from computed style
-        let currentDefault;
-        if (id.includes('accent')) {
-            const settings = getSettings();
-            currentDefault = settings.accentColor || '#e79fa8';
-        } else {
-            currentDefault = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim() || '#e79fa8';
+        // We need to verify if the picker actually visually updates.
+        // Some versions of toolcool-color-picker might need explicit .color property update too
+        if (picker.color !== safeDefault) {
+            picker.color = safeDefault;
         }
-        
-        // Update picker with current default
-        picker.setAttribute('color', currentDefault);
-        if (picker.color !== currentDefault) {
-            picker.color = currentDefault;
-        }
-        
-        // Force visual update
-        requestAnimationFrame(() => {
-            if (picker.color !== currentDefault) {
-                picker.color = currentDefault;
-            }
-        });
-        
-        // Update stored default
-        picker.dataset.defaultColor = currentDefault;
         
         onChangeCallback();
     });
@@ -376,12 +299,12 @@ export async function addCharacterEditorButton() {
             const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
             
             let accentVal = p1.hex;
-            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && accentVal.toLowerCase() === currentGlobalAccent.toLowerCase())) {
+            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && areColorsEqual(accentVal, currentGlobalAccent))) {
                accentVal = null;
             }
             
             let quoteVal = p2.hex;
-            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && quoteVal.toLowerCase() === currentGlobalQuote.toLowerCase())) {
+            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && areColorsEqual(quoteVal, currentGlobalQuote))) {
                 quoteVal = null;
             }
             
@@ -452,9 +375,20 @@ export async function addPersonaPanelButton() {
         const p1 = document.getElementById('persona_banner_custom_accent');
         const p2 = document.getElementById('persona_banner_custom_quote');
         if (p1 && p2) {
-            // Check for default state (inheritance)
-            const accentVal = p1.parentNode.dataset.isDefault === 'true' ? null : p1.hex;
-            const quoteVal = p2.parentNode.dataset.isDefault === 'true' ? null : p2.hex;
+            // Strict check: if it matches global default, FORCE inheritance (null)
+            const settings = getSettings();
+            const currentGlobalAccent = settings.accentColor || '#e79fa8';
+            const currentGlobalQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+
+            let accentVal = p1.hex;
+            if (p1.parentNode.dataset.isDefault === 'true' || (accentVal && areColorsEqual(accentVal, currentGlobalAccent))) {
+                accentVal = null;
+            }
+
+            let quoteVal = p2.hex;
+            if (p2.parentNode.dataset.isDefault === 'true' || (quoteVal && areColorsEqual(quoteVal, currentGlobalQuote))) {
+                quoteVal = null;
+            }
 
             saveUserColors(ua, accentVal, quoteVal);
             applyBannersToChat();
