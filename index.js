@@ -15,6 +15,7 @@ const ExtensionState = {
     currentLoadedFont: null,
     charClickHandlerBound: false,
     personaClickHandlerBound: false,
+    lastKnownQuoteColor: '', // Track for observer
 };
 
 const defaultSettings = {
@@ -100,6 +101,23 @@ function setupMutationObserver() {
         try {
             for (const mutation of mutations) {
                 if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                    // Check for Theme Color Changes on Root
+                    if (mutation.target === document.documentElement && mutation.attributeName === 'style') {
+                        // Check if the quote color actually changed to avoid spam
+                        const currentQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
+                        if (currentQuote !== ExtensionState.lastKnownQuoteColor) {
+                            ExtensionState.lastKnownQuoteColor = currentQuote;
+                            requestAnimationFrame(() => {
+                                applyBannersToChat(); 
+                                // Also update pickers if open (optional but nice)
+                                const reloadChar = require('./ui-buttons.js').reloadCharacterPickers;
+                                const reloadPersona = require('./ui-buttons.js').reloadPersonaPickers;
+                                if (reloadChar) reloadChar();
+                                if (reloadPersona) reloadPersona();
+                            });
+                        }
+                    }
+
                     const characterPopup = document.getElementById('character_popup');
                     if (characterPopup && characterPopup.style.display !== 'none') {
                         addCharacterEditorButton();
@@ -121,6 +139,7 @@ function setupMutationObserver() {
         const characterPopup = document.getElementById('character_popup');
         const personaButton = document.getElementById('persona-management-button');
         
+        // 1. Observe popups (existing logic)
         if (characterPopup) {
             observer.observe(characterPopup, {
                 childList: true,
@@ -138,6 +157,14 @@ function setupMutationObserver() {
                 subtree: true
             });
         }
+
+        // 2. Observe ROOT HTML element for Theme Changes (The "God Mode" Sync)
+        // SillyTavern updates --SmartThemeQuoteColor on the documentElement.
+        // Observing this guarantees we catch the change instantly.
+        observer.observe(document.documentElement, {
+             attributes: true,
+             attributeFilter: ['style']
+        });
     };
     
     if (document.readyState === 'loading') {

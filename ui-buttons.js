@@ -14,28 +14,9 @@ export function initUIButtons(applyBannersFn, extensionState, getSettingsFn, eve
     ExtensionState = extensionState;
     getSettings = getSettingsFn;
     
-    // Listen directly to SillyTavern's quote color picker for instant updates
-    // This bypasses the 1-second debounced SETTINGS_UPDATED event
-    setTimeout(() => {
-        const quoteColorPicker = document.getElementById('quote-color-picker');
-        if (quoteColorPicker) {
-            // Track the 'current' color as 'last' initially
-            let lastKnownQuoteColor = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
-
-            // Listen for change/input to catch all update types
-            const updateHandler = () => {
-                // Small timeout to let SillyTavern apply its own CSS variables first
-                requestAnimationFrame(() => {
-                    applyBannersToChat();
-                    reloadCharacterPickers();
-                    reloadPersonaPickers();
-                });
-            };
-
-            quoteColorPicker.addEventListener('change', updateHandler);
-            quoteColorPicker.addEventListener('input', updateHandler); // For dragging
-        }
-    }, 1000); // Wait for ST's UI to load
+    applyBannersToChat = applyBannersFn;
+    ExtensionState = extensionState;
+    getSettings = getSettingsFn;
 }
 
 // Reload character pickers with fresh defaults
