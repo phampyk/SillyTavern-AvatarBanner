@@ -234,7 +234,7 @@ async function handleUploadClick(avatarPath, displayName, isUser, characterId = 
              const deleteConfirm = new Popup('Confirm Removal', POPUP_TYPE.CONFIRM, '<p>Are you sure you want to remove this custom image?</p>', { okButton: 'Yes, Remove', cancelButton: 'Cancel' });
              if (await deleteConfirm.show() === true) {
                  isUser ? removeUserBanner(avatarPath) : await removeCharacterBanner(characterId);
-                 applyBannersToChat();
+                 await applyBannersToChat();
                  toastr.info('Custom banner removed');
              }
         }
@@ -251,7 +251,7 @@ async function handleBannerButtonClick(avatarPath, displayName, isUser, characte
         const edit = () => openBannerEditor(avatarPath, displayName, isUser, characterId);
         const del = async () => {
             isUser ? removeUserBanner(avatarPath) : await removeCharacterBanner(characterId);
-            applyBannersToChat();
+            await applyBannersToChat();
             toastr.info(`Banner removed for ${displayName}`);
         };
         existingBanner ? showBannerOptionsPopup(displayName, edit, del) : edit();

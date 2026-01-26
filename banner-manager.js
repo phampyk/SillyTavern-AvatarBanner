@@ -53,8 +53,18 @@ export async function saveCharacterColors(characterId, accentColor, quoteColor) 
 }
 
 export async function removeCharacterBanner(characterId) {
-    // We remove both banner and source
-    return await saveCharacterData(characterId, { banner: null, source: null });
+    // Explicitly delete keys to ensure clean removal
+    const existing = await getCharacterData(characterId);
+    const newData = { ...existing };
+    delete newData.banner;
+    delete newData.source;
+    
+    const context = SillyTavern.getContext();
+    if (context.writeExtensionField) {
+        await context.writeExtensionField(characterId, extensionName, newData);
+        return true;
+    }
+    return false;
 }
 
 let getSettings, saveSettings;
@@ -103,7 +113,12 @@ export function saveUserColors(userAvatar, accentColor, quoteColor) {
 }
 
 export function removeUserBanner(avatarPath) {
-    saveUserData(avatarPath, { banner: null, source: null });
+    const settings = getSettings();
+    if (settings.userBanners && settings.userBanners[avatarPath]) {
+        delete settings.userBanners[avatarPath].banner;
+        delete settings.userBanners[avatarPath].source;
+        saveSettings();
+    }
 }
 
 export function createBannerElement(bannerDataUrl, isMoonlit = false) {
