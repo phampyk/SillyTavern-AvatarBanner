@@ -53,23 +53,13 @@ export async function saveCharacterColors(characterId, accentColor, quoteColor) 
 }
 
 export async function removeCharacterBanner(characterId) {
-    // Manually fetch fresh data to ensure we don't lose the source
-    const existing = await getCharacterData(characterId);
-    
-    // Explicitly construct the payload to preserve source
-    const payload = { 
-        banner: null,
-        source: existing?.source || null // Keep source if exists, else null (to be safe, though usually undefined is fine)
-    };
-    
-    // If we have a source, we MUST enable saving it back to ensure it persists through the overwrite
-    // However, saveCharacterData merges, so passing it explicitly is double-safety.
-    return await saveCharacterData(characterId, payload);
+    // Only remove the active banner, preserving the source for re-cropping
+    return await saveCharacterData(characterId, { banner: "" });
 }
 
 export async function deleteCharacterCustomImage(characterId) {
     // Completely remove both banner and source image
-    return await saveCharacterData(characterId, { banner: null, source: null });
+    return await saveCharacterData(characterId, { banner: "", source: "" });
 }
 
 let getSettings, saveSettings;
@@ -118,11 +108,11 @@ export function saveUserColors(userAvatar, accentColor, quoteColor) {
 }
 
 export function removeUserBanner(avatarPath) {
-    saveUserData(avatarPath, { banner: null });
+    saveUserData(avatarPath, { banner: "" });
 }
 
 export function deleteUserCustomImage(avatarPath) {
-    saveUserData(avatarPath, { banner: null, source: null });
+    saveUserData(avatarPath, { banner: "", source: "" });
 }
 
 export function createBannerElement(bannerDataUrl, isMoonlit = false) {
