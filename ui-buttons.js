@@ -150,31 +150,121 @@ async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
 }
 
 // Editor Helper
-async function openBannerEditor(avatarPath, displayName, isUser = false, characterId = null) {
-    if (!avatarPath) return toastr.warning('No avatar found');
+async function openBannerEditor(avatarPath, displayName, isUser = false, characterId = null, customSource = null) {
+    if (!avatarPath && !customSource) return toastr.warning('No image source found');
     const { Popup, POPUP_TYPE } = SillyTavern.getContext();
 
-    let avatarUrl = isUser ? getPersonaImageUrlFullRes(avatarPath) : `/characters/${avatarPath}`;
-    try {
-        const blob = await (await fetch(avatarUrl)).blob();
-        const reader = new FileReader();
-        const dataUrl = await new Promise((resolve) => { 
-            reader.onload = () => resolve(reader.result); 
-            reader.readAsDataURL(blob); 
-        });
+    // Use custom source if provided, otherwise fetch the avatar
+    let dataUrl = customSource;
 
-        const popup = new Popup(`Configure banner for ${displayName}`, POPUP_TYPE.CROP, '', { cropImage: dataUrl, cropAspect: 4, okButton: 'Save Banner', cancelButton: 'Cancel' });
-        popup.dlg.classList.add('avatar-banner-popup');
-        const result = await popup.show();
-
-        if (result && result.startsWith('data:')) {
-            isUser ? saveUserBanner(avatarPath, result) : await saveCharacterBanner(characterId, result);
-            applyBannersToChat();
-            toastr.success(`Banner saved for ${displayName}`);
+    if (!dataUrl) {
+        let avatarUrl = isUser ? getPersonaImageUrlFullRes(avatarPath) : `/characters/${avatarPath}`;
+        try {
+            const blob = await (await fetch(avatarUrl)).blob();
+            const reader = new FileReader();
+            dataUrl = await new Promise((resolve) => { 
+                reader.onload = () => resolve(reader.result); 
+                reader.readAsDataURL(blob); 
+            });
+        } catch (error) {
+            console.error(`[${extensionName}]`, 'Error loading avatar:', error);
+            toastr.error(`Failed to load avatar image`);
+            return;
         }
-    } catch (error) {
-        console.error(`[${extensionName}]`, 'Error in banner editor:', error);
-        toastr.error(`Failed to load avatar image`);
+    }
+
+    const popup = new Popup(`Configure banner for ${displayName}`, POPUP_TYPE.CROP, '', { cropImage: dataUrl, cropAspect: 4, okButton: 'Save Banner', cancelButton: 'Cancel' });
+    popup.dlg.classList.add('avatar-banner-popup');
+    const result = await popup.show();
+
+    if (result && result.startsWith('data:')) {
+        // If we used a custom source (either new upload or recrop), save it
+        isUser ? saveUserBanner(avatarPath, result, customSource) : await saveCharacterBanner(characterId, result, customSource);
+        applyBannersToChat();
+        toastr.success(`Banner saved for ${displayName}`);
+    }
+}
+
+// Upload/Recrop Handler Helper
+async function handleUploadClick(avatarPath, displayName, isUser, characterId = null, fileInputEl) {
+    const existingData = isUser ? getUserData(avatarPath) : await getCharacterData(characterId);
+    
+    // Helper to start the editor with a specific source
+    const startEditor = (source) => openBannerEditor(avatarPath, displayName, isUser, characterId, source);
+
+    // If we have an existing custom source, offer to Recrop or Delete
+    if (existingData && existingData.source) {
+        const { Popup, POPUP_TYPE } = SillyTavern.getContext();
+        
+        const optionsPopup = new Popup(
+            `Banner Image Options`,
+            POPUP_TYPE.CONFIRM,
+            `<div style="text-align: center;">
+                <p>A custom banner image is already uploaded.</p>
+                <p>Would you like to <b>Recrop</b> the existing image, <b>Delete</b> it, or <b>Upload</b> a new one?</p>
+            </div>`,
+            { okButton: 'Recrop', cancelButton: 'Upload New' } // "Cancel" maps to Upload New visually in this logic flow
+        );
+
+        // We need a third button for "Delete". We can inject it or use a standard confirm flow.
+        // Simplest robust way using standard Popup:
+        // 1. Recrop (OK)
+        // 2. Upload New (Cancel) -> Triggers file input
+        // 3. We can add a "Delete" button via JS after showing, or use a separate "Manage" flow.
+        // Let's use a simpler approach: Recrop (True), New (False). 
+        // But we need Delete.
+        
+        // Alternative: Custom HTML content with buttons that resolve the promise manually? 
+        // SillyTavern Popups are strict. 
+        // Let's try: Recrop (OK), Cancel (to close).
+        // And separate the "Delete" to the trash icon already existing in the UI.
+        // Wait, the user asked for: "press the icon for upload a pop up will show to delete the image or recrop again"
+
+        // Let's build a custom prompt logic.
+        const d = document.createElement('div');
+        d.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                <button id="ab_recrop_btn" class="menu_button">Recrop Existing Image</button>
+                <button id="ab_upload_new_btn" class="menu_button">Upload New Image</button>
+                <button id="ab_delete_custom_btn" class="menu_button fa-solid fa-trash-can" style="color: var(--smart-theme-color-red);"> Remove Custom Image</button>
+            </div>
+        `;
+        
+        const selectionPopup = new Popup(
+            `Manage Custom Banner`,
+            POPUP_TYPE.TEXT,
+            null,
+            { okButton: 'Close', cancelButton: null }
+        );
+        selectionPopup.dlg.querySelector('.popup-body').innerHTML = ''; // Clear default input
+        selectionPopup.dlg.querySelector('.popup-body').appendChild(d);
+        
+        // Bind clicks
+        d.querySelector('#ab_recrop_btn').onclick = () => {
+             selectionPopup.complete(null); // Close popup
+             startEditor(existingData.source);
+        };
+        
+        d.querySelector('#ab_upload_new_btn').onclick = () => {
+            selectionPopup.complete(null);
+            fileInputEl.click();
+        };
+
+        d.querySelector('#ab_delete_custom_btn').onclick = async () => {
+            selectionPopup.complete(null);
+            const confirmDel = new Popup('Confirm Delete', POPUP_TYPE.CONFIRM, 'Remove custom banner image?', { okButton: 'Yes', cancelButton: 'Cancel' });
+            if (await confirmDel.show()) {
+                 isUser ? removeUserBanner(avatarPath) : await removeCharacterBanner(characterId);
+                 applyBannersToChat();
+                 toastr.info('Custom banner removed');
+            }
+        };
+
+        selectionPopup.show();
+
+    } else {
+        // No existing source, just trigger upload
+        fileInputEl.click();
     }
 }
 
@@ -264,10 +354,40 @@ export async function addCharacterEditorButton() {
     container.style.marginTop = '5px';
     container.style.gap = '5px';
 
-    // Banner button
+    // Hidden file input
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.display = 'none';
+    fileInput.onchange = async (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                 const sourceDataUrl = evt.target.result;
+                 const ctx = SillyTavern.getContext();
+                 const cid = ctx.characterId;
+                 const name = ctx.characters?.[cid]?.name || 'Character';
+                 const path = getCurrentCharacterAvatar();
+                 openBannerEditor(path, name, false, cid, sourceDataUrl);
+            };
+            reader.readAsDataURL(file);
+        }
+        // Reset so same file can be selected again if needed
+        e.target.value = '';
+    };
+    container.appendChild(fileInput);
+
+    // Banner button ROW
+    const btnRow = document.createElement('div');
+    btnRow.className = 'flex-container wide100p';
+    btnRow.style.gap = '5px';
+
+    // Main Edit/Config Button
     const button = document.createElement('div');
     button.id = 'avatar_banner_button';
-    button.className = 'menu_button fa-solid fa-panorama interactable wide100p';
+    button.className = 'menu_button fa-solid fa-panorama interactable';
+    button.style.flex = '1';
     button.title = 'Configure Avatar Banner';
     
     button.onclick = async (e) => {
@@ -278,10 +398,25 @@ export async function addCharacterEditorButton() {
         const name = ctx.characters?.[cid]?.name || 'Character';
         if (path && cid !== undefined) await handleBannerButtonClick(path, name, false, cid);
     };
+
+    // Upload Button
+    const uploadBtn = document.createElement('div');
+    uploadBtn.className = 'menu_button fa-solid fa-upload interactable';
+    uploadBtn.title = 'Upload Custom Banner Image';
+    uploadBtn.style.width = '40px'; 
+    uploadBtn.style.textAlign = 'center';
+
+    uploadBtn.onclick = async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const ctx = SillyTavern.getContext();
+        const cid = ctx.characterId;
+        const path = getCurrentCharacterAvatar();
+        const name = ctx.characters?.[cid]?.name || 'Character';
+        if (cid !== undefined) await handleUploadClick(path, name, false, cid, fileInput);
+    };
     
-    const btnRow = document.createElement('div');
-    btnRow.className = 'flex-container wide100p';
     btnRow.appendChild(button);
+    btnRow.appendChild(uploadBtn);
     container.appendChild(btnRow);
 
     // Color save handler (no toast - silent save)
@@ -350,10 +485,37 @@ export async function addPersonaPanelButton() {
     container.style.marginTop = '5px';
     container.style.gap = '5px';
 
-    // Banner button
+    // Hidden file input
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.display = 'none';
+    fileInput.onchange = async (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                 const sourceDataUrl = evt.target.result;
+                 const ua = user_avatar;
+                 const name = power_user.personas[ua] || power_user.name || 'User';
+                 openBannerEditor(ua, name, true, null, sourceDataUrl);
+            };
+            reader.readAsDataURL(file);
+        }
+        e.target.value = '';
+    };
+    container.appendChild(fileInput);
+
+    // Banner button ROW
+    const btnRow = document.createElement('div');
+    btnRow.className = 'flex-container wide100p';
+    btnRow.style.gap = '5px';
+
+    // Main Button
     const button = document.createElement('div');
     button.id = 'persona_banner_button';
-    button.className = 'menu_button fa-solid fa-panorama interactable wide100p';
+    button.className = 'menu_button fa-solid fa-panorama interactable';
+    button.style.flex = '1';
     button.title = 'Configure Persona Banner';
     
     button.onclick = async () => {
@@ -362,9 +524,21 @@ export async function addPersonaPanelButton() {
         if (ua && ua !== 'none') await handleBannerButtonClick(ua, name, true);
     };
 
-    const btnRow = document.createElement('div');
-    btnRow.className = 'flex-container wide100p';
+    // Upload Button
+    const uploadBtn = document.createElement('div');
+    uploadBtn.className = 'menu_button fa-solid fa-upload interactable';
+    uploadBtn.title = 'Upload Custom Banner Image';
+    uploadBtn.style.width = '40px';
+    uploadBtn.style.textAlign = 'center';
+    
+    uploadBtn.onclick = async () => {
+        const ua = user_avatar;
+        const name = power_user.personas[ua] || power_user.name || 'User';
+        if (ua && ua !== 'none') await handleUploadClick(ua, name, true, null, fileInput);
+    };
+
     btnRow.appendChild(button);
+    btnRow.appendChild(uploadBtn);
     container.appendChild(btnRow);
 
     // Color save handler (no toast - silent save)

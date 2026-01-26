@@ -42,8 +42,10 @@ export async function saveCharacterData(characterId, data) {
     }
 }
 
-export async function saveCharacterBanner(characterId, bannerDataUrl) {
-    return await saveCharacterData(characterId, { banner: bannerDataUrl });
+export async function saveCharacterBanner(characterId, bannerDataUrl, sourceDataUrl = null) {
+    const data = { banner: bannerDataUrl };
+    if (sourceDataUrl !== undefined) data.source = sourceDataUrl;
+    return await saveCharacterData(characterId, data);
 }
 
 export async function saveCharacterColors(characterId, accentColor, quoteColor) {
@@ -51,8 +53,8 @@ export async function saveCharacterColors(characterId, accentColor, quoteColor) 
 }
 
 export async function removeCharacterBanner(characterId) {
-    // We only remove the banner property, keeping colors
-    return await saveCharacterData(characterId, { banner: null });
+    // We remove both banner and source
+    return await saveCharacterData(characterId, { banner: null, source: null });
 }
 
 let getSettings, saveSettings;
@@ -90,8 +92,10 @@ export function saveUserData(avatarPath, data) {
     saveSettings();
 }
 
-export function saveUserBanner(userAvatar, bannerDataUrl) {
-    saveUserData(userAvatar, { banner: bannerDataUrl });
+export function saveUserBanner(userAvatar, bannerDataUrl, sourceDataUrl = null) {
+    const data = { banner: bannerDataUrl };
+    if (sourceDataUrl !== undefined) data.source = sourceDataUrl;
+    saveUserData(userAvatar, data);
 }
 
 export function saveUserColors(userAvatar, accentColor, quoteColor) {
@@ -99,7 +103,7 @@ export function saveUserColors(userAvatar, accentColor, quoteColor) {
 }
 
 export function removeUserBanner(avatarPath) {
-    saveUserData(avatarPath, { banner: null });
+    saveUserData(avatarPath, { banner: null, source: null });
 }
 
 export function createBannerElement(bannerDataUrl, isMoonlit = false) {

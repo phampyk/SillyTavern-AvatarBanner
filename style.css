@@ -68,30 +68,29 @@
 
 /* Character/User Name Styling */
 #chat .mes.has-avatar-banner .name_text {
-  display: inline-flex !important;
+  display: inline-flex;
   align-items: baseline;
-  font-size: var(--banner-font-size) !important;
-  font-family: var(--banner-font-family) !important;
+  font-size: var(--banner-font-size);
+  font-family: var(--banner-font-family);
   font-style: italic;
-  line-height: 1.2 !important;
+  line-height: 1.2;
   text-align: left;
-  padding: var(--banner-name-padding-tb) var(--banner-name-padding-lr) !important;
-  padding-right: 5px !important;
+  padding: var(--banner-name-padding-tb) var(--banner-name-padding-lr);
+  padding-right: 5px;
   background: linear-gradient(to bottom, 
       rgba(255, 255, 255, 0.8),
       rgba(var(--banner-accent-rgb), 1)
-  ) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  color: transparent !important;
-  
-  /* Soft glow effect */
-  text-shadow: 0 0 5px rgba(var(--banner-accent-rgb), 1),
-               0 0 1px rgba(255, 255, 255, 1) !important;
-  overflow: visible !important;
-  white-space: normal !important;
-  min-height: 1.2em !important;
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 5px rgba(var(--banner-accent-rgb), 0.8)) 
+          drop-shadow(0 0 2px rgba(255, 255, 255, 0.6));
+  overflow: visible;
+  white-space: normal;
+  min-height: 1.2em;
 }
 
 /* Icons and timestamp styling */
