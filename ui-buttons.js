@@ -141,6 +141,11 @@ async function showBannerOptionsPopup(displayName, onEdit, onDelete) {
         { okButton: 'Edit', cancelButton: 'Remove' }
     );
     
+    // Allow clicking outside to close (simulates ESC)
+    removeConfirm.dlg.addEventListener('click', (e) => {
+        if (e.target === removeConfirm.dlg) removeConfirm.complete(null);
+    });
+    
     const result = await removeConfirm.show();
     if (result === true || result === 1) onEdit();
     else if (result === false || result === 0) {
@@ -156,6 +161,18 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
 
     // Use custom source if provided, otherwise fetch the avatar
     let dataUrl = customSource;
+
+    if (!dataUrl) {
+        // Check if there's a stored custom source for this entity
+        try {
+            const savedData = isUser ? getUserData(avatarPath) : await getCharacterData(characterId);
+            if (savedData && savedData.source) {
+                dataUrl = savedData.source;
+            }
+        } catch (e) {
+            console.warn(`[${extensionName}]`, 'Error checking for saved source:', e);
+        }
+    }
 
     if (!dataUrl) {
         let avatarUrl = isUser ? getPersonaImageUrlFullRes(avatarPath) : `/characters/${avatarPath}`;
@@ -196,72 +213,31 @@ async function handleUploadClick(avatarPath, displayName, isUser, characterId = 
     if (existingData && existingData.source) {
         const { Popup, POPUP_TYPE } = SillyTavern.getContext();
         
-        const optionsPopup = new Popup(
-            `Banner Image Options`,
-            POPUP_TYPE.CONFIRM,
-            `<div style="text-align: center;">
-                <p>A custom banner image is already uploaded.</p>
-                <p>Would you like to <b>Recrop</b> the existing image, <b>Delete</b> it, or <b>Upload</b> a new one?</p>
-            </div>`,
-            { okButton: 'Recrop', cancelButton: 'Upload New' } // "Cancel" maps to Upload New visually in this logic flow
-        );
-
-        // We need a third button for "Delete". We can inject it or use a standard confirm flow.
-        // Simplest robust way using standard Popup:
-        // 1. Recrop (OK)
-        // 2. Upload New (Cancel) -> Triggers file input
-        // 3. We can add a "Delete" button via JS after showing, or use a separate "Manage" flow.
-        // Let's use a simpler approach: Recrop (True), New (False). 
-        // But we need Delete.
-        
-        // Alternative: Custom HTML content with buttons that resolve the promise manually? 
-        // SillyTavern Popups are strict. 
-        // Let's try: Recrop (OK), Cancel (to close).
-        // And separate the "Delete" to the trash icon already existing in the UI.
-        // Wait, the user asked for: "press the icon for upload a pop up will show to delete the image or recrop again"
-
-        // Let's build a custom prompt logic.
-        const d = document.createElement('div');
-        d.innerHTML = `
-            <div class="avatar-banner-popup-menu">
-                <div id="ab_recrop_btn" class="menu_button">Recrop Existing Image</div>
-                <div id="ab_upload_new_btn" class="menu_button">Upload New Image</div>
-                <div id="ab_delete_custom_btn" class="menu_button fa-solid fa-trash-can avatar-banner-delete-btn"> Remove Custom Image</div>
-            </div>
-        `;
-        
-        const selectionPopup = new Popup(
+        const confirm = new Popup(
             `Manage Custom Banner`,
-            POPUP_TYPE.TEXT,
-            null,
-            { okButton: 'Close', cancelButton: null }
+            POPUP_TYPE.CONFIRM,
+            `<div style="text-align: center;"><p>A custom banner image is uploaded.</p><p><b>Recrop</b> the existing image, or <b>Remove</b> it?</p></div>`,
+            { okButton: 'Recrop', cancelButton: 'Remove' }
         );
-        selectionPopup.dlg.querySelector('.popup-body').innerHTML = ''; // Clear default input
-        selectionPopup.dlg.querySelector('.popup-body').appendChild(d);
-        
-        // Bind clicks
-        d.querySelector('#ab_recrop_btn').onclick = () => {
-             selectionPopup.complete(null); // Close popup
-             startEditor(existingData.source);
-        };
-        
-        d.querySelector('#ab_upload_new_btn').onclick = () => {
-            selectionPopup.complete(null);
-            fileInputEl.click();
-        };
 
-        d.querySelector('#ab_delete_custom_btn').onclick = async () => {
-            selectionPopup.complete(null);
-            const confirmDel = new Popup('Confirm Delete', POPUP_TYPE.CONFIRM, 'Remove custom banner image?', { okButton: 'Yes', cancelButton: 'Cancel' });
-            if (await confirmDel.show()) {
+        // Allow clicking outside to close
+        confirm.dlg.addEventListener('click', (e) => {
+            if (e.target === confirm.dlg) confirm.complete(null);
+        });
+
+        const result = await confirm.show();
+        if (result === true || result === 1) {
+            // Recrop
+            startEditor(existingData.source);
+        } else if (result === false || result === 0) {
+            // Remove flow
+             const deleteConfirm = new Popup('Confirm Removal', POPUP_TYPE.CONFIRM, '<p>Are you sure you want to remove this custom image?</p>', { okButton: 'Yes, Remove', cancelButton: 'Cancel' });
+             if (await deleteConfirm.show() === true) {
                  isUser ? removeUserBanner(avatarPath) : await removeCharacterBanner(characterId);
                  applyBannersToChat();
                  toastr.info('Custom banner removed');
-            }
-        };
-
-        selectionPopup.show();
-
+             }
+        }
     } else {
         // No existing source, just trigger upload
         fileInputEl.click();
