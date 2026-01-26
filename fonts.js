@@ -1,7 +1,3 @@
-/**
- * Avatar Banner Extension - Font Management
- */
-
 function parseFontInput(input) {
     if (!input || typeof input !== 'string' || input.trim() === '') {
         return { importStatement: '', fontFamily: '' };
@@ -45,6 +41,17 @@ export function getGoogleFontImport(input) {
     if (!parsed.importStatement) return '';
 
     return parsed.importStatement;
+}
+
+let dynamicStyleElement = null;
+
+export function getDynamicStyleElement() {
+    if (!dynamicStyleElement) {
+        dynamicStyleElement = document.createElement('style');
+        dynamicStyleElement.id = 'avatar-banner-dynamic-styles';
+        document.head.appendChild(dynamicStyleElement);
+    }
+    return dynamicStyleElement;
 }
 
 export function preloadGoogleFont(input, forceReload, ExtensionState) {
