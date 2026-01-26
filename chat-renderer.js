@@ -287,23 +287,27 @@ export async function applyBannersToChat() {
             } else {
                 const charName = mes.getAttribute('ch_name');
                 if (charName) {
-                    let data = charDataCache.get(charName);
-                    // If not in cache, try to fetch and cache it
-                    if (!data) {
-                         const charId = getCharacterIdByName(charName);
-                        if (charId !== undefined && charId >= 0) {
-                            const character = context.characters[charId];
-                            data = character?.data?.extensions?.[extensionName] || {};
-                            charDataCache.set(charName, data);
-                            
-                            if (!characterInfoCache.has(charName)) {
-                                characterInfoCache.set(charName, {
-                                    id: charId,
-                                    displayName: character.name,
-                                    originalName: character._originalName || character.name
-                                });
-                            }
-                        }
+                    let charId = -1;
+                    
+                    // Resolve Name -> ID
+                    if (characterInfoCache.has(charName)) {
+                        charId = characterInfoCache.get(charName).id;
+                    } else {
+                         charId = getCharacterIdByName(charName);
+                         if (charId !== undefined && charId >= 0) {
+                             const character = context.characters[charId];
+                             characterInfoCache.set(charName, {
+                                 id: charId,
+                                 displayName: character.name,
+                                 originalName: character._originalName || character.name
+                             });
+                         }
+                    }
+
+                    // Get FRESH data if we have an ID
+                    let data = {};
+                    if (charId !== undefined && charId >= 0 && context.characters && context.characters[charId]) {
+                        data = context.characters[charId].data?.extensions?.[extensionName] || {};
                     }
 
                     if (data) {

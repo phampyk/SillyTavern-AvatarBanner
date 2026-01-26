@@ -42,7 +42,7 @@ export async function saveCharacterData(characterId, data) {
     }
 }
 
-export async function saveCharacterBanner(characterId, bannerDataUrl, sourceDataUrl = null) {
+export async function saveCharacterBanner(characterId, bannerDataUrl, sourceDataUrl = undefined) {
     const data = { banner: bannerDataUrl };
     if (sourceDataUrl !== undefined) data.source = sourceDataUrl;
     return await saveCharacterData(characterId, data);
@@ -97,7 +97,7 @@ export function saveUserData(avatarPath, data) {
     saveSettings();
 }
 
-export function saveUserBanner(userAvatar, bannerDataUrl, sourceDataUrl = null) {
+export function saveUserBanner(userAvatar, bannerDataUrl, sourceDataUrl = undefined) {
     const data = { banner: bannerDataUrl };
     if (sourceDataUrl !== undefined) data.source = sourceDataUrl;
     saveUserData(userAvatar, data);
