@@ -53,8 +53,18 @@ export async function saveCharacterColors(characterId, accentColor, quoteColor) 
 }
 
 export async function removeCharacterBanner(characterId) {
-    // Only remove the active banner, preserving the source for re-cropping
-    return await saveCharacterData(characterId, { banner: null });
+    // Manually fetch fresh data to ensure we don't lose the source
+    const existing = await getCharacterData(characterId);
+    
+    // Explicitly construct the payload to preserve source
+    const payload = { 
+        banner: null,
+        source: existing?.source || null // Keep source if exists, else null (to be safe, though usually undefined is fine)
+    };
+    
+    // If we have a source, we MUST enable saving it back to ensure it persists through the overwrite
+    // However, saveCharacterData merges, so passing it explicitly is double-safety.
+    return await saveCharacterData(characterId, payload);
 }
 
 export async function deleteCharacterCustomImage(characterId) {
