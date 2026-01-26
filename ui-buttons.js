@@ -1,5 +1,5 @@
 import { getCurrentCharacterAvatar, getPersonaImageUrlFullRes, escapeHtml, areColorsEqual } from './utils.js';
-import { getCharacterBanner, saveCharacterBanner, removeCharacterBanner, getUserBanner, saveUserBanner, removeUserBanner, getCharacterData, getUserData, saveCharacterColors, saveUserColors } from './banner-manager.js';
+import { getCharacterBanner, saveCharacterBanner, removeCharacterBanner, deleteCharacterCustomImage, getUserBanner, saveUserBanner, removeUserBanner, deleteUserCustomImage, getCharacterData, getUserData, saveCharacterColors, saveUserColors } from './banner-manager.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
 
@@ -233,7 +233,7 @@ async function handleUploadClick(avatarPath, displayName, isUser, characterId = 
             // Remove flow
              const deleteConfirm = new Popup('Confirm Removal', POPUP_TYPE.CONFIRM, '<p>Are you sure you want to remove this custom image?</p>', { okButton: 'Yes, Remove', cancelButton: 'Cancel' });
              if (await deleteConfirm.show() === true) {
-                 isUser ? removeUserBanner(avatarPath) : await removeCharacterBanner(characterId);
+                 isUser ? deleteUserCustomImage(avatarPath) : await deleteCharacterCustomImage(characterId);
                  await applyBannersToChat();
                  toastr.info('Custom banner removed');
              }
