@@ -257,59 +257,43 @@ export async function applyBannersToChat() {
         const anyCharacterHasBanner = Array.from(charDataCache.values()).some(d => !!d.banner);
         
         messages.forEach(mes => {
-            const existingBanner = mes.querySelector('.avatar-banner');
-            if (existingBanner) {
-                existingBanner.remove();
-            }
-            
             const isUser = mes.getAttribute('is_user') === 'true';
             
-            if (isUser) {
-                const allowPersonaStyling = settings.enableUserBanners || settings.extraStylingEnabled;
-                if (!anyCharacterHasBanner || !allowPersonaStyling) {
-                    mes.classList.remove('has-avatar-banner', 'moonlit-banner');
-                    return;
-                }
-            }
-            
+            // 1. Determine Desired State
+            let shouldHaveBanner = false;
             let bannerDataUrl = null;
             let customAccent = null;
             let customQuote = null;
-            
+
             if (isUser) {
-                const forceAvatar = mes.getAttribute('force_avatar');
-                let userAvatarPath;
-                if (forceAvatar && forceAvatar.startsWith('User Avatars/')) {
-                    userAvatarPath = forceAvatar.replace('User Avatars/', '');
-                } else {
-                    userAvatarPath = getCurrentUserAvatar();
-                }
-                
-                if (userAvatarPath) {
-                    // getUserData returns object { banner, accentColor, quoteColor, ... }
-                    const userData = getUserData(userAvatarPath);
-                    bannerDataUrl = userData.banner;
-                    customAccent = userData.accentColor;
-                    customQuote = userData.quoteColor;
+                const allowPersonaStyling = settings.enableUserBanners || settings.extraStylingEnabled;
+                if (anyCharacterHasBanner && allowPersonaStyling) {
+                    const forceAvatar = mes.getAttribute('force_avatar');
+                    let userAvatarPath;
+                    if (forceAvatar && forceAvatar.startsWith('User Avatars/')) {
+                        userAvatarPath = forceAvatar.replace('User Avatars/', '');
+                    } else {
+                        userAvatarPath = getCurrentUserAvatar();
+                    }
+                    
+                    if (userAvatarPath) {
+                        const userData = getUserData(userAvatarPath);
+                        bannerDataUrl = userData.banner || null;
+                        customAccent = userData.accentColor;
+                        customQuote = userData.quoteColor;
+                        shouldHaveBanner = !!bannerDataUrl || settings.extraStylingEnabled;
+                    }
                 }
             } else {
                 const charName = mes.getAttribute('ch_name');
                 if (charName) {
-                    if (charDataCache.has(charName)) {
-                        const data = charDataCache.get(charName);
-                        bannerDataUrl = data.banner;
-                        customAccent = data.accentColor;
-                        customQuote = data.quoteColor;
-                    } else {
-                        // Fallback logic for characters not in cache ? (maybe new ones)
-                        const charId = getCharacterIdByName(charName);
+                    let data = charDataCache.get(charName);
+                    // If not in cache, try to fetch and cache it
+                    if (!data) {
+                         const charId = getCharacterIdByName(charName);
                         if (charId !== undefined && charId >= 0) {
                             const character = context.characters[charId];
-                            const data = character?.data?.extensions?.[extensionName] || {};
-                            bannerDataUrl = data.banner || null;
-                            customAccent = data.accentColor;
-                            customQuote = data.quoteColor;
-
+                            data = character?.data?.extensions?.[extensionName] || {};
                             charDataCache.set(charName, data);
                             
                             if (!characterInfoCache.has(charName)) {
@@ -321,63 +305,98 @@ export async function applyBannersToChat() {
                             }
                         }
                     }
+
+                    if (data) {
+                        bannerDataUrl = data.banner || null;
+                        customAccent = data.accentColor;
+                        customQuote = data.quoteColor;
+                        shouldHaveBanner = !!bannerDataUrl;
+                    }
                     
-                    if (settings.useDisplayName && settings.extraStylingEnabled && bannerDataUrl) {
+                    // Handle Name Swapping (Lightweight text check)
+                    if (shouldHaveBanner && settings.useDisplayName && settings.extraStylingEnabled) {
                         const charInfo = characterInfoCache.get(charName);
                         if (charInfo && charInfo.displayName && charInfo.originalName !== charInfo.displayName) {
-                            const nameTextEl = mes.querySelector('.name_text');
-                            if (nameTextEl && nameTextEl.textContent.trim() === charInfo.originalName) {
-                                nameTextEl.textContent = charInfo.displayName;
-                            }
+                             const nameTextEl = mes.querySelector('.name_text');
+                             if (nameTextEl && nameTextEl.textContent.trim() === charInfo.originalName) {
+                                 nameTextEl.textContent = charInfo.displayName;
+                             }
                         }
                     } else {
-                        const charInfo = characterInfoCache.get(charName);
-                        if (charInfo && charInfo.displayName && charInfo.originalName !== charInfo.displayName) {
-                            const nameTextEl = mes.querySelector('.name_text');
-                            if (nameTextEl && nameTextEl.textContent.trim() === charInfo.displayName) {
-                                nameTextEl.textContent = charInfo.originalName;
-                            }
-                        }
+                         const charInfo = characterInfoCache.get(charName);
+                         if (charInfo && charInfo.displayName && charInfo.originalName !== charInfo.displayName) {
+                             const nameTextEl = mes.querySelector('.name_text');
+                             if (nameTextEl && nameTextEl.textContent.trim() === charInfo.displayName) {
+                                 nameTextEl.textContent = charInfo.originalName;
+                             }
+                         }
                     }
                 }
             }
-            
-            // Set CSS variables on the message element - always set when banner exists
-            if (bannerDataUrl || settings.extraStylingEnabled) {
-                setMessageCSSVariables(mes, settings, customAccent, customQuote);
+
+            // 2. CSS Variables Update (Cheap, can be done always or diffed)
+            // We only apply if we have a banner OR extra styling is enabled
+            if (shouldHaveBanner) {
+                 // Optimization: Check if vars are already set to avoid style Recalculation if possible? 
+                 // For now, setting property is relatively cheap compared to DOM insertion
+                 setMessageCSSVariables(mes, settings, customAccent, customQuote);
             }
-            
+
+            // 3. Banner DOM Diffing
+            const existingBanner = mes.querySelector('.avatar-banner');
+            const isMoonlit = isMoonlitTheme(settings);
+
+            // CASE A: We WANT a banner (and it has an image URL)
             if (bannerDataUrl && (!isUser || settings.enableUserBanners)) {
-                const isMoonlit = isMoonlitTheme(settings);
-                const banner = createBannerElement(bannerDataUrl, isMoonlit);
-                
-                if (isMoonlit) {
+                // Check if we need to update classes
+                if (!mes.classList.contains('has-avatar-banner')) mes.classList.add('has-avatar-banner');
+                if (isMoonlit && !mes.classList.contains('moonlit-banner')) mes.classList.add('moonlit-banner');
+                if (!isMoonlit && mes.classList.contains('moonlit-banner')) mes.classList.remove('moonlit-banner');
+
+                // Check existing banner
+                if (existingBanner) {
+                    // banner exists, check if image is correct
+                    // We check the background-image style. Note: style.backgroundImage returns 'url("...")'
+                    // So we do a loose check or just simple string includes if strict equality fails
+                    const currentBg = existingBanner.style.backgroundImage;
+                    const expectedBg = `url("${bannerDataUrl}")`;
+                    
+                    // If the background image is DIFFERENT, update it.
+                    // This prevents reloading the image if it's already there.
+                    // (Using includes because browser might normalize quotes)
+                    if (!currentBg.includes(bannerDataUrl)) { 
+                        existingBanner.style.backgroundImage = expectedBg;
+                    }
+                    // If it matches, DO NOTHING. Performance saved!
+                } else {
+                    // Banner missing, create it
+                    const banner = createBannerElement(bannerDataUrl, isMoonlit);
                     const mesBlock = mes.querySelector('.mes_block');
-                    if (mesBlock) {
-                        mesBlock.style.position = 'relative';
-                        mesBlock.insertBefore(banner, mesBlock.firstChild);
-                        mes.classList.add('has-avatar-banner', 'moonlit-banner');
-                    } else {
-                        mes.style.position = 'relative';
-                        mes.insertBefore(banner, mes.firstChild);
-                        mes.classList.add('has-avatar-banner');
+                    const targetParent = (isMoonlit && mesBlock) ? mesBlock : mes;
+                    // Optimization: Insert at beginning
+                    targetParent.insertBefore(banner, targetParent.firstChild);
+                    
+                    // Set position relative if needed (check style first to avoid thrashing)
+                    if (targetParent.style.position !== 'relative') {
+                        targetParent.style.position = 'relative';
                     }
-                } else {
-                    mes.style.position = 'relative';
-                    mes.insertBefore(banner, mes.firstChild);
-                    mes.classList.add('has-avatar-banner');
                 }
-            } else {
-                const isMoonlit = isMoonlitTheme(settings);
-                const persistStyling = isUser && settings.extraStylingEnabled;
+            } 
+            // CASE B: We do NOT want an image banner, but maybe styling
+            else {
+                // Remove banner if it exists
+                if (existingBanner) {
+                    existingBanner.remove();
+                }
                 
+                // Handle styling classes
+                const persistStyling = isUser && settings.extraStylingEnabled;
                 if (persistStyling) {
-                    mes.classList.add('has-avatar-banner');
-                    if (isMoonlit) {
-                        mes.classList.add('moonlit-banner');
-                    }
+                   if (!mes.classList.contains('has-avatar-banner')) mes.classList.add('has-avatar-banner');
+                   if (isMoonlit && !mes.classList.contains('moonlit-banner')) mes.classList.add('moonlit-banner');
                 } else {
-                    mes.classList.remove('has-avatar-banner', 'moonlit-banner');
+                   if (mes.classList.contains('has-avatar-banner')) mes.classList.remove('has-avatar-banner');
+                   if (mes.classList.contains('moonlit-banner')) mes.classList.remove('moonlit-banner');
                 }
             }
         });
