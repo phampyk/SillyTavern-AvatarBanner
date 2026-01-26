@@ -16,6 +16,7 @@ const ExtensionState = {
     charClickHandlerBound: false,
     personaClickHandlerBound: false,
     lastKnownQuoteColor: '', // Track for observer
+    themeUpdateTimeout: null, // Debounce timer for theme changes
 };
 
 const defaultSettings = {
@@ -105,16 +106,32 @@ function setupMutationObserver() {
                     if (mutation.target === document.documentElement && mutation.attributeName === 'style') {
                         // Check if the quote color actually changed to avoid spam
                         const currentQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
-                        if (currentQuote !== ExtensionState.lastKnownQuoteColor) {
+                        if (currentQuote && currentQuote !== ExtensionState.lastKnownQuoteColor) {
                             ExtensionState.lastKnownQuoteColor = currentQuote;
-                            requestAnimationFrame(() => {
-                                applyBannersToChat(); 
-                                // Also update pickers if open (optional but nice)
-                                const reloadChar = require('./ui-buttons.js').reloadCharacterPickers;
-                                const reloadPersona = require('./ui-buttons.js').reloadPersonaPickers;
-                                if (reloadChar) reloadChar();
-                                if (reloadPersona) reloadPersona();
-                            });
+                            
+                            // Debounce updates to avoid multiple rapid calls
+                            if (ExtensionState.themeUpdateTimeout) {
+                                clearTimeout(ExtensionState.themeUpdateTimeout);
+                            }
+                            
+                            ExtensionState.themeUpdateTimeout = setTimeout(() => {
+                                requestAnimationFrame(() => {
+                                    applyBannersToChat();
+                                    
+                                    // Only reload pickers if they exist and are visible
+                                    const charControls = document.getElementById('avatar_banner_controls');
+                                    const personaControls = document.getElementById('persona_banner_controls');
+                                    
+                                    if (charControls) {
+                                        const reloadChar = require('./ui-buttons.js').reloadCharacterPickers;
+                                        if (reloadChar) reloadChar();
+                                    }
+                                    if (personaControls) {
+                                        const reloadPersona = require('./ui-buttons.js').reloadPersonaPickers;
+                                        if (reloadPersona) reloadPersona();
+                                    }
+                                });
+                            }, 100); // Debounce by 100ms to avoid multiple rapid updates
                         }
                     }
 
@@ -200,6 +217,12 @@ function cleanup() {
         if (ExtensionState.observer) {
             ExtensionState.observer.disconnect();
             ExtensionState.observer = null;
+        }
+
+        // Clean up theme update timeout
+        if (ExtensionState.themeUpdateTimeout) {
+            clearTimeout(ExtensionState.themeUpdateTimeout);
+            ExtensionState.themeUpdateTimeout = null;
         }
 
         const dynamicStyles = document.getElementById('avatar-banner-dynamic-styles');

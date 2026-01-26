@@ -34,7 +34,36 @@ export async function reloadCharacterPickers() {
     const defaultAccent = settings.accentColor;
     const defaultQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
     
-    // Find and remove old picker rows
+    // Find existing pickers
+    const accentPicker = document.getElementById('character_banner_custom_accent');
+    const quotePicker = document.getElementById('character_banner_custom_quote');
+    
+    // If pickers exist, just update their colors
+    if (accentPicker && quotePicker) {
+        const accentRow = accentPicker.closest('.flex-container');
+        const quoteRow = quotePicker.closest('.flex-container');
+        
+        // Update accent picker's stored default
+        accentPicker.dataset.defaultColor = defaultAccent;
+        
+        // Update accent picker if inheriting default
+        if (accentRow && accentRow.dataset.isDefault === 'true') {
+            updatePickerColor(accentPicker, defaultAccent);
+        }
+        
+        // Update quote picker's stored default
+        quotePicker.dataset.defaultColor = defaultQuote;
+        
+        // Update quote picker if inheriting default
+        if (quoteRow && quoteRow.dataset.isDefault === 'true') {
+            updatePickerColor(quotePicker, defaultQuote);
+        }
+        
+        return; // Pickers updated, no need to recreate
+    }
+    
+    // If pickers don't exist, create them (first time initialization)
+    // Find and remove old picker rows (shouldn't happen, but just in case)
     const oldPicker1 = document.getElementById('character_banner_custom_accent');
     const oldPicker2 = document.getElementById('character_banner_custom_quote');
     oldPicker1?.closest('.flex-container')?.remove();
@@ -78,7 +107,36 @@ export function reloadPersonaPickers() {
     const defaultAccent = settings.accentColor;
     const defaultQuote = getComputedStyle(document.documentElement).getPropertyValue('--SmartThemeQuoteColor').trim();
     
-    // Find and remove old picker rows
+    // Find existing pickers
+    const accentPicker = document.getElementById('persona_banner_custom_accent');
+    const quotePicker = document.getElementById('persona_banner_custom_quote');
+    
+    // If pickers exist, just update their colors
+    if (accentPicker && quotePicker) {
+        const accentRow = accentPicker.closest('.flex-container');
+        const quoteRow = quotePicker.closest('.flex-container');
+        
+        // Update accent picker's stored default
+        accentPicker.dataset.defaultColor = defaultAccent;
+        
+        // Update accent picker if inheriting default
+        if (accentRow && accentRow.dataset.isDefault === 'true') {
+            updatePickerColor(accentPicker, defaultAccent);
+        }
+        
+        // Update quote picker's stored default
+        quotePicker.dataset.defaultColor = defaultQuote;
+        
+        // Update quote picker if inheriting default
+        if (quoteRow && quoteRow.dataset.isDefault === 'true') {
+            updatePickerColor(quotePicker, defaultQuote);
+        }
+        
+        return; // Pickers updated, no need to recreate
+    }
+    
+    // If pickers don't exist, create them (first time initialization)
+    // Find and remove old picker rows (shouldn't happen, but just in case)
     const oldPicker1 = document.getElementById('persona_banner_custom_accent');
     const oldPicker2 = document.getElementById('persona_banner_custom_quote');
     oldPicker1?.closest('.flex-container')?.remove();
@@ -118,6 +176,27 @@ export function reloadPersonaPickers() {
     
     container.appendChild(row1);
     container.appendChild(row2);
+}
+
+// Force update a color picker's visual display
+function updatePickerColor(picker, newColor) {
+    if (!picker || !newColor) return;
+    
+    // Update both the attribute and property to ensure it takes effect
+    picker.setAttribute('color', newColor);
+    
+    // Some versions of toolcool-color-picker need explicit property update
+    if (picker.color !== newColor) {
+        picker.color = newColor;
+    }
+    
+    // Force a re-render by triggering the picker's internal update
+    // This ensures the visual display matches the color value
+    requestAnimationFrame(() => {
+        if (picker.color !== newColor) {
+            picker.color = newColor;
+        }
+    });
 }
 
 // Popup Helper
@@ -193,25 +272,31 @@ function createPickerRow(id, labelText, color, defaultColor, onChangeCallback) {
     row.style.gap = '10px';
     
     // Determine initial state: default if color is missing OR strictly matches default
-    const isDefault = !color || (color.toLowerCase && defaultColor.toLowerCase && color.toLowerCase() === defaultColor.toLowerCase());
-    row.dataset.isDefault = isDefault ? 'true' : 'false';
+    const isInheritingDefault = !color || (color.toLowerCase && defaultColor.toLowerCase && color.toLowerCase() === defaultColor.toLowerCase());
+    row.dataset.isDefault = isInheritingDefault ? 'true' : 'false';
     
-    const safeColor = escapeHtml(color || defaultColor || '#e79fa8');
-    const safeDefault = escapeHtml(defaultColor || '#e79fa8');
+    const safeDefault = defaultColor || '#e79fa8';
+    // Always display the default when inheriting, or custom when set
+    const displayColor = isInheritingDefault ? safeDefault : color;
+    const safeColor = escapeHtml(displayColor);
+    const safeDefaultEscaped = escapeHtml(safeDefault);
     
     // Create picker via innerHTML like the settings panel does (line 49 of ui-settings.js)
     row.innerHTML = `
         <toolcool-color-picker id="${id}" color="${safeColor}" popup-position="left"></toolcool-color-picker>
         <span style="opacity: 0.7">${labelText}</span>
-        <i class="fa-solid fa-arrow-rotate-right menu_button" title="Reset to default" data-default="${safeDefault}" style="cursor: pointer; opacity: 0.6;"></i>
+        <i class="fa-solid fa-arrow-rotate-right menu_button" title="Reset to default" data-default="${safeDefaultEscaped}" style="cursor: pointer; opacity: 0.6;"></i>
     `;
     
     const picker = row.querySelector('toolcool-color-picker');
     const resetBtn = row.querySelector('i');
     
+    // Store the default color on the picker element for later reference
+    picker.dataset.defaultColor = safeDefault;
+    
     picker.addEventListener('change', () => {
         // If user manually picks the default color, treat it as inheriting default
-        const currentHex = picker.hex || picker.color; // toolcool picker property
+        const currentHex = picker.hex || picker.color;
         const movesToDefault = currentHex && defaultColor && currentHex.toLowerCase() === defaultColor.toLowerCase();
         row.dataset.isDefault = movesToDefault ? 'true' : 'false';
         onChangeCallback();
@@ -220,13 +305,12 @@ function createPickerRow(id, labelText, color, defaultColor, onChangeCallback) {
     // Reset button handler
     resetBtn.addEventListener('click', () => {
         row.dataset.isDefault = 'true';
-        picker.setAttribute('color', safeDefault);
         
-        // We need to verify if the picker actually visually updates.
-        // Some versions of toolcool-color-picker might need explicit .color property update too
-        if (picker.color !== safeDefault) {
-            picker.color = safeDefault;
-        }
+        // Get the current default color (might have changed since picker was created)
+        const currentDefault = picker.dataset.defaultColor || defaultColor || '#e79fa8';
+        
+        // Update the picker to show current default
+        updatePickerColor(picker, currentDefault);
         
         onChangeCallback();
     });
