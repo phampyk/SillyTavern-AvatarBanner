@@ -62,7 +62,6 @@ body.bubblechat #chat {{selector}}::before {
     align-items: baseline;
     font-size: {{fontSize}} !important;
     font-family: {{fontFamily}} !important;
-    font-style: italic;
     line-height: 1.2 !important;
     text-align: left;
     padding: {{namePaddingTB}} {{namePaddingLR}} !important;
@@ -193,7 +192,6 @@ body.bubblechat #chat {{selector}}::before {
     align-items: baseline;
     font-size: {{fontSize}} !important;
     font-family: {{fontFamily}} !important;
-    font-style: italic;
     line-height: 1.2 !important;
     text-align: left;
     padding: {{namePaddingTB}} {{namePaddingLR}} !important;
