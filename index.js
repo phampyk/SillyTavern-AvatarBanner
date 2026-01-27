@@ -223,18 +223,12 @@ async function init() {
         });
 
         const settingsUpdatedHandler = () => {
-            regenerateCSS();
-            // Moonlit spams settings_updated events constantly, so only reload pickers
-            // when the quote color actually changes. Normal ST doesn't spam, so reload directly.
-            if (isMoonlitTheme()) {
-                const currentQuoteColor = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--SmartThemeQuoteColor').trim();
-                if (currentQuoteColor !== ExtensionState.lastQuoteColor) {
-                    ExtensionState.lastQuoteColor = currentQuoteColor;
-                    reloadCharacterPickers();
-                    reloadPersonaPickers();
-                }
-            } else {
+            // settings_updated fires constantly - only check if quote color changed
+            // to refresh color pickers (no CSS regeneration needed here)
+            const currentQuoteColor = getComputedStyle(document.documentElement)
+                .getPropertyValue('--SmartThemeQuoteColor').trim();
+            if (currentQuoteColor !== ExtensionState.lastQuoteColor) {
+                ExtensionState.lastQuoteColor = currentQuoteColor;
                 reloadCharacterPickers();
                 reloadPersonaPickers();
             }
