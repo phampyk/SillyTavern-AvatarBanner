@@ -22,7 +22,8 @@ function parseFontInput(input) {
     }
 
     fontFamily = trimmed;
-    const formattedName = fontFamily.replace(/\s+/g, '+');
+    // Properly encode the font name for URL safety
+    const formattedName = encodeURIComponent(fontFamily).replace(/%20/g, '+');
     url = `https://fonts.googleapis.com/css2?family=${formattedName}&display=swap`;
 
     return {

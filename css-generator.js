@@ -5,7 +5,7 @@
  * with user settings, and injects the final CSS into the document.
  */
 
-import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCurrentUserAvatar, isMoonlitTheme, hexToRgb } from './utils.js';
+import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCurrentUserAvatar, isMoonlitTheme, hexToRgb, isValidImageDataUrl } from './utils.js';
 import { getCharacterData, getUserData } from './banner-manager.js';
 import { getGoogleFontImport, preloadGoogleFont, getFontFamilyName } from './fonts.js';
 
@@ -157,18 +157,9 @@ async function _generateCSSInternal() {
     try {
         const settings = getSettings();
         
-        // Get or create the style element
-        let styleEl = document.getElementById(STYLE_ID);
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = STYLE_ID;
-            document.head.appendChild(styleEl);
-        }
-
         // Master toggle off = clear everything
         if (!settings.enabled) {
-            styleEl.textContent = '/* Avatar Banner Disabled */';
-            document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
+            cleanupCSS();
             return;
         }
 
@@ -221,8 +212,8 @@ async function _generateCSSInternal() {
 
             const data = await getCharacterData(charId);
             
-            // Skip characters without banners
-            if (!data.banner) continue;
+            // Skip characters without banners or with invalid banner data
+            if (!data.banner || !isValidImageDataUrl(data.banner)) continue;
 
             anyCharacterHasBanner = true;
 
@@ -263,12 +254,15 @@ async function _generateCSSInternal() {
             const userData = getUserData(userAvatar);
             const userSelector = '.mes[is_user="true"]';
             
+            // Validate user banner if present
+            const hasValidUserBanner = userData.banner && isValidImageDataUrl(userData.banner);
+            
             // Determine if user should get styling
             let includeUserStyling = false;
             let includeUserBanner = false;
 
-            if (settings.enableUserBanners && userData.banner) {
-                // User banners enabled AND user has a banner = full styling
+            if (settings.enableUserBanners && hasValidUserBanner) {
+                // User banners enabled AND user has a valid banner = full styling
                 includeUserStyling = true;
                 includeUserBanner = true;
             } else if (!settings.enableUserBanners && anyCharacterHasBanner) {
@@ -297,7 +291,8 @@ async function _generateCSSInternal() {
         if (settings.enablePanelBanner && !isGroupChat() && context.characterId !== undefined) {
             const charData = await getCharacterData(context.characterId);
             
-            if (charData.banner) {
+            // Validate panel banner
+            if (charData.banner && isValidImageDataUrl(charData.banner)) {
                 const panelTemplateName = isMoonlit ? 'PANEL_MOONLIT' : 'PANEL_STANDARD';
                 const panelValues = {
                     bannerUrl: charData.banner.replace(/"/g, '\\"').replace(/[\n\r]/g, '')
@@ -322,8 +317,24 @@ async function _generateCSSInternal() {
             document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
         }
 
-        // Inject the CSS
-        styleEl.textContent = cssOutput;
+        // Inject the CSS via Blob URL (shows as separate file in DevTools)
+        const blob = new Blob([cssOutput], { type: 'text/css' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Remove old link if exists and revoke old blob URL
+        const oldLink = document.getElementById(STYLE_ID);
+        if (oldLink) {
+            const oldUrl = oldLink.href;
+            oldLink.remove();
+            URL.revokeObjectURL(oldUrl);
+        }
+        
+        // Create new link element
+        const linkEl = document.createElement('link');
+        linkEl.id = STYLE_ID;
+        linkEl.rel = 'stylesheet';
+        linkEl.href = blobUrl;
+        document.head.appendChild(linkEl);
 
     } catch (error) {
         console.error(`[${extensionName}] CSS generation error:`, error);
@@ -334,8 +345,12 @@ async function _generateCSSInternal() {
  * Cleanup function - removes generated styles
  */
 export function cleanupCSS() {
-    const styleEl = document.getElementById(STYLE_ID);
-    if (styleEl) styleEl.remove();
+    const linkEl = document.getElementById(STYLE_ID);
+    if (linkEl) {
+        const oldUrl = linkEl.href;
+        linkEl.remove();
+        URL.revokeObjectURL(oldUrl);
+    }
     
     document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
     

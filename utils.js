@@ -120,6 +120,13 @@ export function isMoonlitTheme(settings) {
     return hasMoonlitClass || hasMoonlitStyle;
 }
 
+// Validate that a string is a safe data URL for images
+export function isValidImageDataUrl(str) {
+    if (!str || typeof str !== 'string') return false;
+    // Must start with data:image/ and contain base64 data
+    return /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(str);
+}
+
 // Robust color comparison
 export function areColorsEqual(color1, color2) {
     if (!color1 || !color2) return false;

@@ -5,6 +5,7 @@ import { createSettingsPanel } from './ui-settings.js';
 import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons, reloadCharacterPickers, reloadPersonaPickers } from './ui-buttons.js';
 import { initCSSGenerator, regenerateCSS, regenerateCSSImmediate, cleanupCSS } from './css-generator.js';
 import { initBannerManager } from './banner-manager.js';
+import { isMoonlitTheme } from './utils.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
@@ -13,6 +14,7 @@ const ExtensionState = {
     observer: null,
     initialized: false,
     currentLoadedFont: null,
+    lastQuoteColor: null,  // Track quote color to avoid unnecessary picker reloads
 };
 
 const defaultSettings = {
@@ -222,9 +224,20 @@ async function init() {
 
         const settingsUpdatedHandler = () => {
             regenerateCSS();
-            // Refresh color pickers in case theme colors changed (e.g. --SmartThemeQuoteColor)
-            reloadCharacterPickers();
-            reloadPersonaPickers();
+            // Moonlit spams settings_updated events constantly, so only reload pickers
+            // when the quote color actually changes. Normal ST doesn't spam, so reload directly.
+            if (isMoonlitTheme()) {
+                const currentQuoteColor = getComputedStyle(document.documentElement)
+                    .getPropertyValue('--SmartThemeQuoteColor').trim();
+                if (currentQuoteColor !== ExtensionState.lastQuoteColor) {
+                    ExtensionState.lastQuoteColor = currentQuoteColor;
+                    reloadCharacterPickers();
+                    reloadPersonaPickers();
+                }
+            } else {
+                reloadCharacterPickers();
+                reloadPersonaPickers();
+            }
         };
         eventSource.on(event_types.SETTINGS_UPDATED, settingsUpdatedHandler);
         ExtensionState.cleanupFunctions.push(() => {
