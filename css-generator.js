@@ -127,27 +127,30 @@ function buildBaseValues(settings, accentRGB, quoteColor) {
 
 /**
  * Main function: Generate and inject CSS
- * Debounced to prevent rapid re-renders
+ * Debounced to prevent rapid re-renders (150ms to let Moonlit settle)
  */
 export function regenerateCSS() {
     if (debounceTimer) {
-        cancelAnimationFrame(debounceTimer);
+        clearTimeout(debounceTimer);
     }
-    debounceTimer = requestAnimationFrame(() => {
+    debounceTimer = setTimeout(() => {
         debounceTimer = null;
         _generateCSSInternal();
-    });
+    }, 150);
 }
 
 /**
  * Force immediate CSS generation (for init/chat change)
+ * Still debounced but with shorter delay to batch rapid events
  */
 export function regenerateCSSImmediate() {
     if (debounceTimer) {
-        cancelAnimationFrame(debounceTimer);
-        debounceTimer = null;
+        clearTimeout(debounceTimer);
     }
-    _generateCSSInternal();
+    debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        _generateCSSInternal();
+    }, 50);
 }
 
 /**
