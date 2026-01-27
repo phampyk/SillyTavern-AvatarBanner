@@ -320,24 +320,16 @@ async function _generateCSSInternal() {
             document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
         }
 
-        // Inject the CSS via Blob URL (shows as separate file in DevTools)
-        const blob = new Blob([cssOutput], { type: 'text/css' });
-        const blobUrl = URL.createObjectURL(blob);
-        
-        // Remove old link if exists and revoke old blob URL
-        const oldLink = document.getElementById(STYLE_ID);
-        if (oldLink) {
-            const oldUrl = oldLink.href;
-            oldLink.remove();
-            URL.revokeObjectURL(oldUrl);
+        // Inject the CSS via style element
+        // (Blob URLs cause cross-origin issues with ST's dynamic-styles.js)
+        let styleEl = document.getElementById(STYLE_ID);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = STYLE_ID;
+            styleEl.setAttribute('data-source', 'SillyTavern-AvatarBanner');
+            document.head.appendChild(styleEl);
         }
-        
-        // Create new link element
-        const linkEl = document.createElement('link');
-        linkEl.id = STYLE_ID;
-        linkEl.rel = 'stylesheet';
-        linkEl.href = blobUrl;
-        document.head.appendChild(linkEl);
+        styleEl.textContent = cssOutput;
 
     } catch (error) {
         console.error(`[${extensionName}] CSS generation error:`, error);
@@ -348,11 +340,9 @@ async function _generateCSSInternal() {
  * Cleanup function - removes generated styles
  */
 export function cleanupCSS() {
-    const linkEl = document.getElementById(STYLE_ID);
-    if (linkEl) {
-        const oldUrl = linkEl.href;
-        linkEl.remove();
-        URL.revokeObjectURL(oldUrl);
+    const styleEl = document.getElementById(STYLE_ID);
+    if (styleEl) {
+        styleEl.remove();
     }
     
     document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
