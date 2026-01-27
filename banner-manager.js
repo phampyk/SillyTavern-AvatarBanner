@@ -114,15 +114,3 @@ export function removeUserBanner(avatarPath) {
 export function deleteUserCustomImage(avatarPath) {
     saveUserData(avatarPath, { banner: "", source: "" });
 }
-
-export function createBannerElement(bannerDataUrl, isMoonlit = false) {
-    const banner = document.createElement('div');
-    banner.className = 'avatar-banner';
-
-    const safeUrl = bannerDataUrl.replace(/"/g, '\\"').replace(/\n/g, '').replace(/\r/g, '');
-
-    // Only set the dynamic background image URL variable
-    banner.style.setProperty('--banner-url', `url("${safeUrl}")`);
-
-    return banner;
-}

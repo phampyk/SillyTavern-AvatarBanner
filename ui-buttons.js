@@ -1,4 +1,4 @@
-import { getCurrentCharacterAvatar, getPersonaImageUrlFullRes, escapeHtml, areColorsEqual } from './utils.js';
+import { getCurrentCharacterAvatar, getPersonaImageUrlFullRes, escapeHtml, areColorsEqual, isMoonlitTheme } from './utils.js';
 import { getCharacterBanner, saveCharacterBanner, removeCharacterBanner, deleteCharacterCustomImage, getUserBanner, saveUserBanner, removeUserBanner, deleteUserCustomImage, getCharacterData, getUserData, saveCharacterColors, saveUserColors } from './banner-manager.js';
 import { power_user } from '../../../power-user.js';
 import { user_avatar } from '../../../personas.js';
@@ -175,7 +175,14 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
     }
 
     if (!dataUrl) {
-        let avatarUrl = isUser ? getPersonaImageUrlFullRes(avatarPath) : `/characters/${avatarPath}`;
+        // For Moonlit theme, use thumbnail to avoid fetching huge character cards (can be 20MB+)
+        // Default ST uses medium quality thumbnails already, but Moonlit recommends high-res settings
+        const useThumbnail = !isUser && isMoonlitTheme(getSettings());
+        let avatarUrl = isUser 
+            ? getPersonaImageUrlFullRes(avatarPath) 
+            : useThumbnail 
+                ? `/thumbnail?type=avatar&file=${encodeURIComponent(avatarPath)}`
+                : `/characters/${avatarPath}`;
         try {
             const blob = await (await fetch(avatarUrl)).blob();
             const reader = new FileReader();

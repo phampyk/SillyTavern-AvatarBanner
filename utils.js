@@ -54,22 +54,6 @@ export function getCharacterIdByAvatar(avatarFilename) {
     }
 }
 
-// Get character ID by name (supports chat-name extension via _originalName)
-export function getCharacterIdByName(name) {
-    try {
-        const context = SillyTavern.getContext();
-        if (!context.characters) return undefined;
-        // Check both name and _originalName for chat-name extension compatibility
-        const index = context.characters.findIndex(c =>
-            c.name === name || c._originalName === name
-        );
-        return index >= 0 ? index : undefined;
-    } catch (error) {
-        console.error(`[${extensionName}]`, 'Error getting character by name:', error);
-        return undefined;
-    }
-}
-
 // Get the current user/persona avatar path
 export function getCurrentUserAvatar() {
     return user_avatar || null;

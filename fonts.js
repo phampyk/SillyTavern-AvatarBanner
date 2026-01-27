@@ -43,17 +43,6 @@ export function getGoogleFontImport(input) {
     return parsed.importStatement;
 }
 
-let dynamicStyleElement = null;
-
-export function getDynamicStyleElement() {
-    if (!dynamicStyleElement) {
-        dynamicStyleElement = document.createElement('style');
-        dynamicStyleElement.id = 'avatar-banner-dynamic-styles';
-        document.head.appendChild(dynamicStyleElement);
-    }
-    return dynamicStyleElement;
-}
-
 export function preloadGoogleFont(input, forceReload, ExtensionState) {
     const parsed = parseFontInput(input);
     if (!parsed.importStatement) return;
