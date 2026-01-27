@@ -34,7 +34,7 @@ async function loadTemplates() {
     if (templates) return templates;
 
     try {
-        const response = await fetch(`${EXTENSION_PATH}/style.css`);
+        const response = await fetch(`${EXTENSION_PATH}/templates.txt`);
         const cssText = await response.text();
 
         templates = {};
