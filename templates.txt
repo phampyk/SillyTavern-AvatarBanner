@@ -188,7 +188,7 @@ body.bubblechat #chat {{selector}}::before {
 #chat {{selector}} .name_text {
     display: inline-flex !important;
     align-items: baseline;
-    font-size: {{fontSize}};
+    font-size: {{fontSize}} !important;
     font-family: {{fontFamily}};
     text-align: left;
     padding: {{namePaddingTB}} {{namePaddingLR}};
