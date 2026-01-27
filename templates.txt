@@ -227,7 +227,8 @@ body.bubblechat #chat {{selector}}::before {
 #chat {{selector}} .timestamp-icon {
     aspect-ratio: auto !important;
     place-self: auto !important;
-    margin-right: 0 !important;
+    margin-right: -0.3rem !important;
+    margin-left: 0.5rem;
 }
 
 {{selector}} .mes_buttons,
