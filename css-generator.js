@@ -109,7 +109,7 @@ function getQuoteColor(entityQuoteColor) {
 /**
  * Build common placeholder values from settings
  */
-function buildBaseValues(settings, accentRGB, quoteColor) {
+function buildBaseValues(settings, accentRGB, quoteColor, isUser = false) {
     const fontFamily = getFontFamilyName(settings.fontFamily);
     
     return {
@@ -121,7 +121,8 @@ function buildBaseValues(settings, accentRGB, quoteColor) {
         accentR: accentRGB.r,
         accentG: accentRGB.g,
         accentB: accentRGB.b,
-        quoteColor: quoteColor
+        quoteColor: quoteColor,
+        blurTintColor: isUser ? 'var(--SmartThemeUserMesBlurTintColor)' : 'var(--SmartThemeBotMesBlurTintColor)'
     };
 }
 
@@ -228,7 +229,7 @@ async function _generateCSSInternal() {
             const quoteColor = getQuoteColor(data.quoteColor);
 
             const values = {
-                ...buildBaseValues(settings, accentRGB, quoteColor),
+                ...buildBaseValues(settings, accentRGB, quoteColor, false),
                 selector: selector,
                 bannerUrl: data.banner.replace(/"/g, '\\"').replace(/[\n\r]/g, '')
             };
@@ -279,7 +280,7 @@ async function _generateCSSInternal() {
                 const quoteColor = getQuoteColor(userData.quoteColor);
 
                 const values = {
-                    ...buildBaseValues(settings, accentRGB, quoteColor),
+                    ...buildBaseValues(settings, accentRGB, quoteColor, true),
                     selector: userSelector,
                     bannerUrl: includeUserBanner ? userData.banner.replace(/"/g, '\\"').replace(/[\n\r]/g, '') : ''
                 };
