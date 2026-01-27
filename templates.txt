@@ -62,25 +62,23 @@ body.bubblechat #chat {{selector}}::before {
     align-items: baseline;
     font-size: {{fontSize}} !important;
     font-family: {{fontFamily}} !important;
-    line-height: 1.2 !important;
     text-align: left;
     padding: {{namePaddingTB}} {{namePaddingLR}} !important;
-    padding-right: 5px !important;
     background: linear-gradient(
         to bottom,
         rgba(255, 255, 255, 0.8),
         rgba({{accentR}}, {{accentG}}, {{accentB}}, 1)
-    ) !important;
+    );
+    filter: drop-shadow(0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.5));
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
-    color: transparent !important;
-    text-shadow:
-        0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 1),
-        0 0 1px rgba(255, 255, 255, 1) !important;
+    color: transparent;
+    text-shadow: none;
+    padding-right: 0.2em !important;
+    margin-right: -0.2em !important;
     overflow: visible !important;
     white-space: normal !important;
-    min-height: 1.2em !important;
 }
 
 {{selector}} .name_text img,
@@ -190,27 +188,25 @@ body.bubblechat #chat {{selector}}::before {
 #chat {{selector}} .name_text {
     display: inline-flex !important;
     align-items: baseline;
-    font-size: {{fontSize}} !important;
-    font-family: {{fontFamily}} !important;
-    line-height: 1.2 !important;
+    font-size: {{fontSize}};
+    font-family: {{fontFamily}};
     text-align: left;
-    padding: {{namePaddingTB}} {{namePaddingLR}} !important;
-    padding-right: 5px !important;
+    padding: {{namePaddingTB}} {{namePaddingLR}};
     background: linear-gradient(
         to bottom,
         rgba(255, 255, 255, 0.8),
         rgba({{accentR}}, {{accentG}}, {{accentB}}, 1)
-    ) !important;
-    -webkit-background-clip: text !important;
-    background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    color: transparent !important;
-    text-shadow:
-        0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 1),
-        0 0 1px rgba(255, 255, 255, 1) !important;
+    );
+    filter: drop-shadow(0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.5));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: none;
+    padding-right: 0.2em !important;
+    margin-right: -0.2em !important;
     overflow: visible !important;
     white-space: normal !important;
-    min-height: 1.2em !important;
 }
 
 {{selector}} .name_text img,
