@@ -2,7 +2,7 @@ import { eventSource, event_types, saveSettingsDebounced } from '../../../../scr
 import { extension_settings } from '../../../extensions.js';
 
 import { createSettingsPanel } from './ui-settings.js';
-import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons } from './ui-buttons.js';
+import { addCharacterEditorButton, addPersonaPanelButton, initUIButtons, reloadCharacterPickers, reloadPersonaPickers } from './ui-buttons.js';
 import { initCSSGenerator, regenerateCSS, regenerateCSSImmediate, cleanupCSS } from './css-generator.js';
 import { initBannerManager } from './banner-manager.js';
 
@@ -222,6 +222,9 @@ async function init() {
 
         const settingsUpdatedHandler = () => {
             regenerateCSS();
+            // Refresh color pickers in case theme colors changed (e.g. --SmartThemeQuoteColor)
+            reloadCharacterPickers();
+            reloadPersonaPickers();
         };
         eventSource.on(event_types.SETTINGS_UPDATED, settingsUpdatedHandler);
         ExtensionState.cleanupFunctions.push(() => {
