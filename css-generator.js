@@ -1,183 +1,347 @@
 /**
- * Avatar Banner Extension - CSS Generation
+ * CSS Generator for Avatar Banner Extension
+ * 
+ * Reads template blocks from style.css, substitutes placeholders
+ * with user settings, and injects the final CSS into the document.
  */
-import { escapeCSS, hexToRgb, rgba } from './utils.js';
-import { getFontFamilyName } from './fonts.js';
 
-let dynamicStyleElement = null;
+import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCurrentUserAvatar, isMoonlitTheme, hexToRgb } from './utils.js';
+import { getCharacterData, getUserData } from './banner-manager.js';
+import { getGoogleFontImport, preloadGoogleFont, getFontFamilyName } from './fonts.js';
 
-export function getDynamicStyleElement() {
-    if (!dynamicStyleElement) {
-        dynamicStyleElement = document.createElement('style');
-        dynamicStyleElement.id = 'avatar-banner-dynamic-styles';
-        document.head.appendChild(dynamicStyleElement);
-    }
-    return dynamicStyleElement;
+const extensionName = 'SillyTavern-AvatarBanner';
+const STYLE_ID = 'avatar-banner-dynamic';
+const EXTENSION_PATH = '/scripts/extensions/third-party/SillyTavern-AvatarBanner';
+
+let getSettings;
+let ExtensionState;
+let templates = null;
+let debounceTimer = null;
+
+/**
+ * Initialize the CSS generator
+ */
+export function initCSSGenerator(getSettingsFn, extensionState) {
+    getSettings = getSettingsFn;
+    ExtensionState = extensionState;
 }
 
-export function generateExtraStylingCSS(characterName, isUser, settings, displayName = null, isMoonlit = false) {
-    const rgb = hexToRgb(settings.accentColor);
-    const blurTintVar = isUser ? '--SmartThemeUserMesBlurTintColor' : '--SmartThemeBotMesBlurTintColor';
-    const paddingTop = Math.max(settings.bannerHeight - 30, 50);
-    const paddingTopMobile = Math.max(Math.round(settings.bannerHeight * 0.45 - 23), 20);
-    const parsedFontName = getFontFamilyName(settings.fontFamily);
-    const fontFamily = parsedFontName ? `"${parsedFontName}", cursive` : '"Caveat", cursive';
-    const fontSize = settings.fontSize || 36;
-    const fontSizeMobile = Math.max(Math.round(fontSize * 0.7), 20);
-    const namePaddingTB = Number.isFinite(settings.namePaddingTB) ? settings.namePaddingTB : 6;
-    const namePaddingLR = Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 10;
+/**
+ * Load and parse templates from style.css
+ * Called once on init, cached for subsequent uses
+ */
+async function loadTemplates() {
+    if (templates) return templates;
 
-    let selector;
-    if (isUser) {
-        selector = '.mes[is_user="true"]';
-    } else {
-        const escapedName = escapeCSS(characterName);
-        selector = `.mes[ch_name="${escapedName}"]`;
-    }
+    try {
+        const response = await fetch(`${EXTENSION_PATH}/style.css`);
+        const cssText = await response.text();
 
-    let css = '';
+        templates = {};
+        const regex = /\/\* @TEMPLATE: (\w+) \*\/([\s\S]*?)\/\* @END: \1 \*\//g;
+        let match;
 
-    css += `#chat ${selector} .ch_name .name_text,\n`;
-    css += `#chat ${selector}.moonlit-banner .ch_name .name_text,\n`;
-    css += `#chat ${selector} .name_text,\n`; 
-    css += `html body #chat ${selector} .name_text,\n`;
-    
-    if (isUser) {
-        css += `#chat .mes[is_user="true"] .name_text,\n`;
-    } else {
-        css += `#chat .mes[is_user="false"] .name_text,\n`;
-    }
-
-    css += `${selector} .ch_name .name_text {\n`;
-    css += `    font-size: ${fontSize}px !important;\n`;
-    css += `    font-family: ${fontFamily} !important;\n`;
-    css += `    line-height: 1.6 !important;\n`;
-    css += `    padding: ${namePaddingTB}px ${namePaddingLR}px !important;\n`;
-    css += `    overflow: visible !important;\n`;
-    css += `    clip: unset !important;\n`;
-    css += `    clip-path: none !important;\n`;
-    css += `    text-overflow: unset !important;\n`;
-    css += `    white-space: normal !important;\n`;
-    css += `    min-height: 1.6em !important;\n`;
-    css += `    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.8), ${rgba(rgb, 1)}) !important;\n`;
-    css += `    -webkit-background-clip: text !important;\n`;
-    css += `    background-clip: text !important;\n`;
-    css += `    -webkit-text-fill-color: transparent !important;\n`;
-    css += `    color: transparent !important;\n`;
-    css += `    text-shadow: none !important;\n`;
-    css += `    filter: drop-shadow(0 0 5px ${rgba(rgb, 0.3)}) drop-shadow(0 0 1px rgba(255, 255, 255, 0.3)) !important;\n`;
-    css += `}\n\n`;
-
-    css += `${selector} .ch_name,\n`;
-    css += `${selector} .mes_block,\n`;
-    css += `${selector} .mesIDDisplay,\n`;
-    css += `${selector} .mes_text_container {\n`;
-    css += `    overflow: visible !important;\n`;
-    css += `    text-overflow: unset !important;\n`;
-    css += `}\n\n`;
-
-    css += `${selector} .name_text img,\n`;
-    css += `${selector} .name_text span,\n`;
-    css += `${selector} .name_text svg,\n`;
-    css += `${selector} .icon-svg,\n`;
-    css += `${selector} .timestamp {\n`;
-    css += `    fill: currentColor;\n`;
-    css += `    height: 14px;\n`;
-    css += `    aspect-ratio: 1;\n`;
-    css += `    place-self: unset;\n`;
-    css += `    margin-right: 5px;\n`;
-    css += `    white-space: nowrap;\n`;
-    css += `}\n\n`;
-    
-    css += `${selector} .mes_button,\n`;
-    css += `${selector} .extraMesButtons > div {\n`;
-    css += `    place-self: center baseline;\n`;
-    css += `    align-self: center;\n`;
-    css += `    font-size: 14px;\n`;
-    css += `    padding: 5px;\n`;
-    css += `    margin-left: 3px;\n`;
-    css += `    border-radius: 50%;\n`;
-    css += `    background: linear-gradient(to bottom, ${rgba(rgb, 0.8)}, rgba(255, 255, 255, 0.5));\n`;
-    css += `    color: rgba(255, 255, 255, 0.9);\n`;
-    css += `    box-shadow: 0 0 5px ${rgba(rgb, 0.8)};\n`;
-    css += `    transition: all 0.3s ease-in-out;\n`;
-    css += `}\n\n`;
-    
-    if (!isMoonlit) {
-        if (isUser) {
-            css += `#chat ${selector} {\n`;
-            css += `    position: relative;\n`;
-            css += `    padding: 15px 25px 15px 25px !important;\n`;
-            css += `    background:\n`;
-            css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
-            css += `        var(${blurTintVar});\n`;
-            css += `    border: ${rgba(rgb, 0.7)} solid 2px !important;\n`;
-            css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
-            css += `}\n\n`;
-
-            css += `#chat ${selector}.has-avatar-banner {\n`;
-            css += `    padding-top: ${paddingTop}px !important;\n`;
-            css += `}\n\n`;
-            
-            css += `@media screen and (max-width: 768px) {\n`;
-            css += `    #chat ${selector} {\n`;
-            css += `        padding: 10px 15px 10px 15px !important;\n`;
-            css += `    }\n`;
-            css += `    #chat ${selector}.has-avatar-banner {\n`;
-            css += `        padding-top: ${paddingTopMobile}px !important;\n`;
-            css += `    }\n`;
-            css += `    ${selector} .name_text {\n`;
-            css += `        font-size: ${fontSizeMobile}px !important;\n`;
-            css += `        padding: ${namePaddingTB}px ${namePaddingLR}px !important;\n`;
-            css += `    }\n`;
-            css += `}\n\n`;
-        } else {
-            css += `#chat ${selector}.has-avatar-banner {\n`;
-            css += `    position: relative;\n`;
-            css += `    padding: ${paddingTop}px 25px 15px !important;\n`;
-            css += `    background:\n`;
-            css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
-            css += `        var(${blurTintVar});\n`;
-            css += `    border: ${rgba(rgb, 0.7)} solid 2px !important;\n`;
-            css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
-            css += `}\n\n`;
-            
-            css += `@media screen and (max-width: 768px) {\n`;
-            css += `    #chat ${selector}.has-avatar-banner {\n`;
-            css += `        padding: ${paddingTopMobile}px 15px 10px !important;\n`;
-            css += `    }\n`;
-            css += `    ${selector} .name_text {\n`;
-            css += `        font-size: ${fontSizeMobile}px !important;\n`;
-            css += `        padding: ${namePaddingTB}px ${namePaddingLR}px !important;\n`;
-            css += `    }\n`;
-            css += `}\n\n`;
+        while ((match = regex.exec(cssText)) !== null) {
+            templates[match[1]] = match[2].trim();
         }
 
-        css += `#chat ${selector} .avatar {\n`;
-        css += `    display: none !important;\n`;
-        css += `}\n\n`;
-    } else {
-        const moonlitSelector = `#chat .mes${selector}.moonlit-banner .mes_block`;
-        
-        css += `html body ${moonlitSelector},\n`;
-        css += `${moonlitSelector} {\n`;
-        css += `    background:\n`;
-        css += `        linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0) 90%, ${rgba(rgb, 0.5)} 100%),\n`;
-        css += `        var(${blurTintVar});\n`;
-        css += `    border: ${rgba(rgb, 0.7)} solid 2px !important;\n`;
-        css += `    box-shadow: 3px 3px 10px ${rgba(rgb, 0.25)} !important;\n`;
-        css += `}\n\n`;
+        console.log(`[${extensionName}] Loaded templates:`, Object.keys(templates));
+        return templates;
 
-        css += `html body #chat .mes${selector}.moonlit-banner .avatar,\n`;
-        css += `#chat .mes${selector}.moonlit-banner .avatar {\n`;
-        css += `    display: none !important;\n`;
-        css += `    visibility: hidden !important;\n`;
-        css += `    opacity: 0 !important;\n`;
-        css += `    width: 0 !important;\n`;
-        css += `    height: 0 !important;\n`;
-        css += `    margin: 0 !important;\n`;
-        css += `}\n\n`;
+    } catch (error) {
+        console.error(`[${extensionName}] Failed to load templates:`, error);
+        return {};
+    }
+}
+
+/**
+ * Process a template with given values
+ * @param {string} templateName - Name of template (STANDARD, MOONLIT, etc.)
+ * @param {object} values - Placeholder values to substitute
+ * @param {object} options - Options like { includeBanner: true/false }
+ * @returns {string} Processed CSS
+ */
+function processTemplate(templateName, values, options = {}) {
+    let css = templates[templateName];
+    if (!css) {
+        console.warn(`[${extensionName}] Template not found: ${templateName}`);
+        return '';
+    }
+
+    // If no banner, strip the banner block and padding
+    if (!options.includeBanner) {
+        // Remove everything between @BANNER_START and @BANNER_END
+        css = css.replace(/\/\* @BANNER_START \*\/[\s\S]*?\/\* @BANNER_END \*\//g, '');
+        // Remove padding lines
+        css = css.replace(/\/\* @PADDING_START \*\/[\s\S]*?\/\* @PADDING_END \*\//g, '');
+    }
+
+    // Substitute all placeholders
+    for (const [key, value] of Object.entries(values)) {
+        const placeholder = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+        css = css.replace(placeholder, value);
     }
 
     return css;
 }
+
+/**
+ * Get accent color RGB values
+ * Falls back to global setting if per-entity color not set
+ */
+function getAccentRGB(entityAccentColor, settings) {
+    const color = entityAccentColor || settings.accentColor || '#e79fa8';
+    const rgb = hexToRgb(color);
+    return rgb || { r: 231, g: 159, b: 168 };
+}
+
+/**
+ * Get quote color
+ * Falls back to theme default if not set
+ */
+function getQuoteColor(entityQuoteColor) {
+    if (entityQuoteColor) return entityQuoteColor;
+    // Get from theme
+    return getComputedStyle(document.documentElement)
+        .getPropertyValue('--SmartThemeQuoteColor').trim() || '#e79fa8';
+}
+
+/**
+ * Build common placeholder values from settings
+ */
+function buildBaseValues(settings, accentRGB, quoteColor) {
+    const fontFamily = getFontFamilyName(settings.fontFamily);
+    
+    return {
+        bannerHeight: `${settings.bannerHeight}vh`,
+        fontSize: `${settings.fontSize}rem`,
+        fontFamily: fontFamily ? `"${fontFamily}", cursive` : '"Caveat", cursive',
+        namePaddingTB: `${settings.namePaddingTB}em`,
+        namePaddingLR: `${settings.namePaddingLR}em`,
+        accentR: accentRGB.r,
+        accentG: accentRGB.g,
+        accentB: accentRGB.b,
+        quoteColor: quoteColor
+    };
+}
+
+/**
+ * Main function: Generate and inject CSS
+ * Debounced to prevent rapid re-renders
+ */
+export function regenerateCSS() {
+    if (debounceTimer) {
+        cancelAnimationFrame(debounceTimer);
+    }
+    debounceTimer = requestAnimationFrame(() => {
+        debounceTimer = null;
+        _generateCSSInternal();
+    });
+}
+
+/**
+ * Force immediate CSS generation (for init/chat change)
+ */
+export function regenerateCSSImmediate() {
+    if (debounceTimer) {
+        cancelAnimationFrame(debounceTimer);
+        debounceTimer = null;
+    }
+    _generateCSSInternal();
+}
+
+/**
+ * Internal CSS generation logic
+ */
+async function _generateCSSInternal() {
+    try {
+        const settings = getSettings();
+        
+        // Get or create the style element
+        let styleEl = document.getElementById(STYLE_ID);
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = STYLE_ID;
+            document.head.appendChild(styleEl);
+        }
+
+        // Master toggle off = clear everything
+        if (!settings.enabled) {
+            styleEl.textContent = '/* Avatar Banner Disabled */';
+            document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
+            return;
+        }
+
+        // Load templates if not cached
+        await loadTemplates();
+        if (!templates || Object.keys(templates).length === 0) {
+            console.error(`[${extensionName}] No templates loaded`);
+            return;
+        }
+
+        const context = SillyTavern.getContext();
+        const isMoonlit = isMoonlitTheme(settings);
+        const templateName = isMoonlit ? 'MOONLIT' : 'STANDARD';
+        
+        let cssOutput = '/* Avatar Banner - Generated CSS */\n\n';
+
+        // Add font import if custom font set
+        if (settings.fontFamily) {
+            const fontImport = getGoogleFontImport(settings.fontFamily);
+            if (fontImport) {
+                cssOutput += fontImport + '\n\n';
+                preloadGoogleFont(settings.fontFamily, false, ExtensionState);
+            }
+        }
+
+        // Track if ANY character has a banner (for user styling logic)
+        let anyCharacterHasBanner = false;
+
+        // Collect characters to process
+        const charactersToProcess = new Set();
+        
+        if (isGroupChat()) {
+            const group = getCurrentGroup();
+            if (group?.members) {
+                group.members.forEach(m => {
+                    const id = getCharacterIdByAvatar(m);
+                    if (id !== undefined && id >= 0) {
+                        charactersToProcess.add(id);
+                    }
+                });
+            }
+        } else if (context.characterId !== undefined) {
+            charactersToProcess.add(context.characterId);
+        }
+
+        // Process each character
+        for (const charId of charactersToProcess) {
+            const character = context.characters[charId];
+            if (!character) continue;
+
+            const data = await getCharacterData(charId);
+            
+            // Skip characters without banners
+            if (!data.banner) continue;
+
+            anyCharacterHasBanner = true;
+
+            const name = character.name;
+            const escapedName = CSS.escape(name);
+            const selector = `.mes[ch_name="${escapedName}"]`;
+
+            const accentRGB = getAccentRGB(data.accentColor, settings);
+            const quoteColor = getQuoteColor(data.quoteColor);
+
+            const values = {
+                ...buildBaseValues(settings, accentRGB, quoteColor),
+                selector: selector,
+                bannerUrl: data.banner.replace(/"/g, '\\"').replace(/[\n\r]/g, '')
+            };
+
+            cssOutput += `/* Character: ${name} */\n`;
+            cssOutput += processTemplate(templateName, values, { includeBanner: true });
+            cssOutput += '\n\n';
+
+            // Handle _originalName for chat-name extension compatibility
+            const originalName = character._originalName;
+            if (originalName && originalName !== name) {
+                const escapedOriginal = CSS.escape(originalName);
+                const originalSelector = `.mes[ch_name="${escapedOriginal}"]`;
+                
+                const originalValues = { ...values, selector: originalSelector };
+                
+                cssOutput += `/* Character (original name): ${originalName} */\n`;
+                cssOutput += processTemplate(templateName, originalValues, { includeBanner: true });
+                cssOutput += '\n\n';
+            }
+        }
+
+        // Process user/persona
+        const userAvatar = getCurrentUserAvatar();
+        if (userAvatar) {
+            const userData = getUserData(userAvatar);
+            const userSelector = '.mes[is_user="true"]';
+            
+            // Determine if user should get styling
+            let includeUserStyling = false;
+            let includeUserBanner = false;
+
+            if (settings.enableUserBanners && userData.banner) {
+                // User banners enabled AND user has a banner = full styling
+                includeUserStyling = true;
+                includeUserBanner = true;
+            } else if (!settings.enableUserBanners && anyCharacterHasBanner) {
+                // User banners disabled BUT character has banner = styling only, no banner
+                includeUserStyling = true;
+                includeUserBanner = false;
+            }
+
+            if (includeUserStyling) {
+                const accentRGB = getAccentRGB(userData.accentColor, settings);
+                const quoteColor = getQuoteColor(userData.quoteColor);
+
+                const values = {
+                    ...buildBaseValues(settings, accentRGB, quoteColor),
+                    selector: userSelector,
+                    bannerUrl: includeUserBanner ? userData.banner.replace(/"/g, '\\"').replace(/[\n\r]/g, '') : ''
+                };
+
+                cssOutput += `/* User/Persona */\n`;
+                cssOutput += processTemplate(templateName, values, { includeBanner: includeUserBanner });
+                cssOutput += '\n\n';
+            }
+        }
+
+        // Panel banner (single chat only, not groups)
+        if (settings.enablePanelBanner && !isGroupChat() && context.characterId !== undefined) {
+            const charData = await getCharacterData(context.characterId);
+            
+            if (charData.banner) {
+                const panelTemplateName = isMoonlit ? 'PANEL_MOONLIT' : 'PANEL_STANDARD';
+                const panelValues = {
+                    bannerUrl: charData.banner.replace(/"/g, '\\"').replace(/[\n\r]/g, '')
+                };
+
+                cssOutput += `/* Panel Banner */\n`;
+                cssOutput += processTemplate(panelTemplateName, panelValues, { includeBanner: true });
+                cssOutput += '\n\n';
+
+                // Add body class for panel banner CSS
+                if (isMoonlit) {
+                    document.body.classList.add('has-panel-banner-moonlit');
+                    document.body.classList.remove('has-panel-banner');
+                } else {
+                    document.body.classList.add('has-panel-banner');
+                    document.body.classList.remove('has-panel-banner-moonlit');
+                }
+            } else {
+                document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
+            }
+        } else {
+            document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
+        }
+
+        // Inject the CSS
+        styleEl.textContent = cssOutput;
+
+    } catch (error) {
+        console.error(`[${extensionName}] CSS generation error:`, error);
+    }
+}
+
+/**
+ * Cleanup function - removes generated styles
+ */
+export function cleanupCSS() {
+    const styleEl = document.getElementById(STYLE_ID);
+    if (styleEl) styleEl.remove();
+    
+    document.body.classList.remove('has-panel-banner', 'has-panel-banner-moonlit');
+    
+    templates = null;
+}
+
+// Alias for backwards compatibility with existing code
+export const applyBannersToChat = regenerateCSS;
+export const updateDynamicCSS = regenerateCSS;

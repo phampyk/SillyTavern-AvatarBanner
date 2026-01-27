@@ -1,13 +1,10 @@
-/**
- * Avatar Banner Extension - UI Settings
- */
-
 import { escapeHtml } from './utils.js';
 import { preloadGoogleFont } from './fonts.js';
+import { reloadCharacterPickers, reloadPersonaPickers } from './ui-buttons.js';
 
 const extensionName = 'SillyTavern-AvatarBanner';
 
-export function createSettingsPanel(getSettings, saveSettings, applyBannersToChat, ExtensionState) {
+export function createSettingsPanel(getSettings, saveSettings, regenerateCSS, ExtensionState) {
     const settings = getSettings();
     const disabledClass = settings.extraStylingEnabled ? '' : 'disabled';
     
@@ -38,10 +35,10 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
                         <span>Enable Persona Banners</span>
                         <div class="fa-solid fa-circle-info opacity50p" title="When enabled, persona messages will also show banners if configured."></div>
                     </label>
-                    <label class="checkbox_label flexnowrap ${disabledClass}" for="avatar_banner_use_display_name" id="avatar_banner_display_name_row">
-                        <input type="checkbox" id="avatar_banner_use_display_name" ${settings.useDisplayName ? 'checked' : ''}>
-                        <span>Use Display Name</span>
-                        <div class="fa-solid fa-circle-info opacity50p" title="Show short display name instead of full card name. Only works with extra styling enabled."></div>
+                    <label class="checkbox_label flexnowrap" for="avatar_banner_panel_enabled">
+                        <input type="checkbox" id="avatar_banner_panel_enabled" ${settings.enablePanelBanner ? 'checked' : ''}>
+                        <span>Enable Panel Banner</span>
+                        <div class="fa-solid fa-circle-info opacity50p" title="Shows the character banner in the character manager panel."></div>
                     </label>
                 </div>
                 
@@ -64,38 +61,38 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
                 <div class="avatar-banner-grid-row">
                     <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                         <small>
-                            <span>Banner Size</span>
-                            <div class="fa-solid fa-circle-info opacity50p" title="Height of the banner image in pixels"></div>
+                            <span>Banner Size (vh)</span>
+                            <div class="fa-solid fa-circle-info opacity50p" title="Height of the banner as % of screen height (responsive)"></div>
                         </small>
-                        <input class="neo-range-slider" type="range" id="avatar_banner_height" min="80" max="300" step="1" value="${settings.bannerHeight}">
-                        <input class="neo-range-input" type="number" min="80" max="300" step="1" id="avatar_banner_height_counter" value="${settings.bannerHeight}">
+                        <input class="neo-range-slider" type="range" id="avatar_banner_height" min="5" max="35" step="1" value="${settings.bannerHeight}">
+                        <input class="neo-range-input" type="number" min="5" max="35" step="1" id="avatar_banner_height_counter" value="${settings.bannerHeight}">
                     </div>
                     <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0 ${disabledClass}" id="avatar_banner_fontsize_row">
                         <small>
-                            <span>Font Size</span>
-                            <div class="fa-solid fa-circle-info opacity50p" title="Size of the character/persona name text"></div>
+                            <span>Font Size (rem)</span>
+                            <div class="fa-solid fa-circle-info opacity50p" title="Size of the character/persona name text in rem units"></div>
                         </small>
-                        <input class="neo-range-slider" type="range" id="avatar_banner_fontsize" min="16" max="72" step="1" value="${settings.fontSize || 36}">
-                        <input class="neo-range-input" type="number" min="16" max="72" step="1" id="avatar_banner_fontsize_counter" value="${settings.fontSize || 36}">
+                        <input class="neo-range-slider" type="range" id="avatar_banner_fontsize" min="1" max="4.5" step="0.0625" value="${settings.fontSize || 2.25}">
+                        <input class="neo-range-input" type="number" min="1" max="4.5" step="0.0625" id="avatar_banner_fontsize_counter" value="${settings.fontSize || 2.25}">
                     </div>
                 </div>
 
                 <div class="avatar-banner-grid-row ${disabledClass}" id="avatar_banner_namepadding_row">
                     <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                         <small>
-                            <span>Name Padding (T/B)</span>
-                            <div class="fa-solid fa-circle-info opacity50p" title="Top/bottom padding for the name text (px)"></div>
+                            <span>Name Padding (T/B) (em)</span>
+                            <div class="fa-solid fa-circle-info opacity50p" title="Top/bottom padding for the name text in em units (scales with font size)"></div>
                         </small>
-                        <input class="neo-range-slider" type="range" id="avatar_banner_namepad_tb" min="0" max="40" step="1" value="${Number.isFinite(settings.namePaddingTB) ? settings.namePaddingTB : 6}">
-                        <input class="neo-range-input" type="number" min="0" max="40" step="1" id="avatar_banner_namepad_tb_counter" value="${Number.isFinite(settings.namePaddingTB) ? settings.namePaddingTB : 6}">
+                        <input class="neo-range-slider" type="range" id="avatar_banner_namepad_tb" min="0" max="0.556" step="0.028" value="${Number.isFinite(settings.namePaddingTB) ? settings.namePaddingTB : 0}">
+                        <input class="neo-range-input" type="number" min="0" max="0.556" step="0.028" id="avatar_banner_namepad_tb_counter" value="${Number.isFinite(settings.namePaddingTB) ? settings.namePaddingTB : 0}">
                     </div>
                     <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
                         <small>
-                            <span>Name Padding (L/R)</span>
-                            <div class="fa-solid fa-circle-info opacity50p" title="Left/right padding for the name text (px)"></div>
+                            <span>Name Padding (L/R) (em)</span>
+                            <div class="fa-solid fa-circle-info opacity50p" title="Left/right padding for the name text in em units (scales with font size)"></div>
                         </small>
-                        <input class="neo-range-slider" type="range" id="avatar_banner_namepad_lr" min="0" max="60" step="1" value="${Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 10}">
-                        <input class="neo-range-input" type="number" min="0" max="60" step="1" id="avatar_banner_namepad_lr_counter" value="${Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 10}">
+                        <input class="neo-range-slider" type="range" id="avatar_banner_namepad_lr" min="0" max="0.556" step="0.028" value="${Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 0}">
+                        <input class="neo-range-input" type="number" min="0" max="0.556" step="0.028" id="avatar_banner_namepad_lr_counter" value="${Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 0}">
                     </div>
                 </div>
             </div>
@@ -105,33 +102,56 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
 
     const extensionsSettings = document.getElementById('extensions_settings');
     if (extensionsSettings) {
+        // Prevent duplicate panels
+        const existingPanel = document.getElementById('avatar-banner-settings-container');
+        if (existingPanel) return;
+
         const container = document.createElement('div');
+        container.id = 'avatar-banner-settings-container';
         container.innerHTML = settingsHtml;
         extensionsSettings.appendChild(container);
 
+        // Register cleanup for the settings panel
+        ExtensionState.cleanupFunctions.push(() => {
+            const panel = document.getElementById('avatar-banner-settings-container');
+            if (panel) panel.remove();
+        });
+
+        // === Event Listeners ===
+
+        // Master toggle
         document.getElementById('avatar_banner_enabled').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.enabled = e.target.checked;
             saveSettings();
-            applyBannersToChat();
+            regenerateCSS();
         });
 
-
+        // User banners toggle
         document.getElementById('avatar_banner_user_enabled').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.enableUserBanners = e.target.checked;
             saveSettings();
-            applyBannersToChat();
+            regenerateCSS();
         });
 
+        // Panel banner toggle
+        document.getElementById('avatar_banner_panel_enabled').addEventListener('change', (e) => {
+            const settings = getSettings();
+            settings.enablePanelBanner = e.target.checked;
+            saveSettings();
+            regenerateCSS();
+        });
+
+        // Banner height slider
         const heightSlider = document.getElementById('avatar_banner_height');
         const heightCounter = document.getElementById('avatar_banner_height_counter');
         
         const updateBannerHeight = (value) => {
             const settings = getSettings();
-            settings.bannerHeight = parseInt(value, 10);
+            settings.bannerHeight = parseFloat(value);
             saveSettings();
-            applyBannersToChat();
+            regenerateCSS();
         };
         
         heightSlider.addEventListener('input', (e) => {
@@ -144,14 +164,15 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
             updateBannerHeight(e.target.value);
         });
         
+        // Font size slider
         const fontSizeSlider = document.getElementById('avatar_banner_fontsize');
         const fontSizeCounter = document.getElementById('avatar_banner_fontsize_counter');
         
         const updateFontSize = (value) => {
             const settings = getSettings();
-            settings.fontSize = parseInt(value, 10);
+            settings.fontSize = parseFloat(value);
             saveSettings();
-            applyBannersToChat();
+            regenerateCSS();
         };
         
         fontSizeSlider.addEventListener('input', (e) => {
@@ -164,6 +185,7 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
             updateFontSize(e.target.value);
         });
 
+        // Name padding sliders
         const namePadTbSlider = document.getElementById('avatar_banner_namepad_tb');
         const namePadTbCounter = document.getElementById('avatar_banner_namepad_tb_counter');
         const namePadLrSlider = document.getElementById('avatar_banner_namepad_lr');
@@ -171,16 +193,16 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
 
         const updateNamePaddingTB = (value) => {
             const settings = getSettings();
-            settings.namePaddingTB = parseInt(value, 10);
+            settings.namePaddingTB = parseFloat(value);
             saveSettings();
-            applyBannersToChat();
+            regenerateCSS();
         };
 
         const updateNamePaddingLR = (value) => {
             const settings = getSettings();
-            settings.namePaddingLR = parseInt(value, 10);
+            settings.namePaddingLR = parseFloat(value);
             saveSettings();
-            applyBannersToChat();
+            regenerateCSS();
         };
 
         if (namePadTbSlider && namePadTbCounter) {
@@ -207,6 +229,7 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
             });
         }
         
+        // Extra styling toggle
         document.getElementById('avatar_banner_extra_styling').addEventListener('change', (e) => {
             const settings = getSettings();
             settings.extraStylingEnabled = e.target.checked;
@@ -216,25 +239,23 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
             const colorRow = document.getElementById('avatar_banner_color_row');
             const fontSizeRow = document.getElementById('avatar_banner_fontsize_row');
             const namePaddingRow = document.getElementById('avatar_banner_namepadding_row');
-            const displayNameRow = document.getElementById('avatar_banner_display_name_row');
             
             if (e.target.checked) {
                 fontRow.classList.remove('disabled');
                 colorRow.classList.remove('disabled');
                 fontSizeRow.classList.remove('disabled');
                 namePaddingRow?.classList.remove('disabled');
-                displayNameRow?.classList.remove('disabled');
             } else {
                 fontRow.classList.add('disabled');
                 colorRow.classList.add('disabled');
                 fontSizeRow.classList.add('disabled');
                 namePaddingRow?.classList.add('disabled');
-                displayNameRow?.classList.add('disabled');
             }
             
-            applyBannersToChat();
+            regenerateCSS();
         });
         
+        // Font family input
         document.getElementById('avatar_banner_font').addEventListener('input', (e) => {
             const settings = getSettings();
             const newFont = e.target.value.trim();
@@ -247,17 +268,11 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
                     preloadGoogleFont(newFont, true, ExtensionState);
                 }
                 
-                applyBannersToChat();
+                regenerateCSS();
             }
         });
         
-        document.getElementById('avatar_banner_use_display_name').addEventListener('change', (e) => {
-            const settings = getSettings();
-            settings.useDisplayName = e.target.checked;
-            saveSettings();
-            applyBannersToChat();
-        });
-        
+        // Accent color picker
         const colorPicker = document.getElementById('avatar_banner_color');
         if (colorPicker) {
             colorPicker.addEventListener('change', (e) => {
@@ -266,13 +281,12 @@ export function createSettingsPanel(getSettings, saveSettings, applyBannersToCha
                 if (color) {
                     settings.accentColor = color;
                     saveSettings();
-                    applyBannersToChat();
+                    regenerateCSS();
+                    // Reload open pickers to reflect new default
+                    reloadCharacterPickers();
+                    reloadPersonaPickers();
                 }
             });
         }
     }
 }
-
-/**
- * Inject required CSS styles
- */

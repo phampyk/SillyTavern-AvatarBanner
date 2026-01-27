@@ -1,56 +1,65 @@
-/**
- * Avatar Banner Extension - Banner Management
- */
 const extensionName = 'SillyTavern-AvatarBanner';
 
-export async function getCharacterBanner(characterId) {
+
+export async function getCharacterData(characterId) {
     try {
         const context = SillyTavern.getContext();
         const character = context.characters?.[characterId];
-        return character?.data?.extensions?.[extensionName]?.banner || null;
+        const data = character?.data?.extensions?.[extensionName];
+        return data || {};
     } catch (error) {
-        console.error(`[${extensionName}]`, 'Error getting character banner:', error);
-        return null;
+        console.error(`[${extensionName}]`, 'Error getting character data:', error);
+        return {};
     }
 }
 
-export async function saveCharacterBanner(characterId, bannerDataUrl) {
+export async function getCharacterBanner(characterId) {
+    const data = await getCharacterData(characterId);
+    return data.banner || null;
+}
+
+export async function saveCharacterData(characterId, data) {
     try {
         const context = SillyTavern.getContext();
         const { writeExtensionField } = context;
 
         if (!writeExtensionField) {
             console.error(`[${extensionName}]`, 'writeExtensionField not available');
-            toastr.error('Cannot save banner - API not available');
             return false;
         }
 
-        await writeExtensionField(characterId, extensionName, { banner: bannerDataUrl });
+        // Get existing data to merge
+        const existingData = await getCharacterData(characterId);
+        const newData = { ...existingData, ...data };
+
+        await writeExtensionField(characterId, extensionName, newData);
         return true;
 
     } catch (error) {
-        console.error(`[${extensionName}]`, 'Error saving character banner:', error);
-        toastr.error('Failed to save banner');
+        console.error(`[${extensionName}]`, 'Error saving character data:', error);
+        toastr.error('Failed to save data');
         return false;
     }
 }
 
+export async function saveCharacterBanner(characterId, bannerDataUrl, sourceDataUrl = undefined) {
+    const data = { banner: bannerDataUrl };
+    if (sourceDataUrl !== undefined) data.source = sourceDataUrl;
+    return await saveCharacterData(characterId, data);
+}
+
+export async function saveCharacterColors(characterId, accentColor, quoteColor) {
+    return await saveCharacterData(characterId, { accentColor, quoteColor });
+}
+
 export async function removeCharacterBanner(characterId) {
-    try {
-        const context = SillyTavern.getContext();
-        const { writeExtensionField } = context;
+    // Only remove the active banner, preserving the source for re-cropping
+    return await saveCharacterData(characterId, { banner: "" });
+}
 
-        if (!writeExtensionField) {
-            return false;
-        }
-
-        await writeExtensionField(characterId, extensionName, { banner: null });
-        return true;
-
-    } catch (error) {
-        console.error(`[${extensionName}]`, 'Error removing character banner:', error);
-        return false;
-    }
+export async function deleteCharacterCustomImage(characterId) {
+    // Completely remove both banner and source image
+    return await saveCharacterData(characterId, { banner: "", source: "" });
 }
 
 let getSettings, saveSettings;
@@ -60,62 +69,60 @@ export function initBannerManager(getSettingsFn, saveSettingsFn) {
     saveSettings = saveSettingsFn;
 }
 
-export function getUserBanner(avatarPath) {
+export function getUserData(avatarPath) {
     const settings = getSettings();
-    return settings.userBanners?.[avatarPath] || null;
+    const entry = settings.userBanners?.[avatarPath];
+    
+    // Handle legacy format (string) vs new format (object)
+    if (typeof entry === 'string') {
+        return { banner: entry };
+    }
+    return entry || {};
 }
 
-export function saveUserBanner(userAvatar, bannerDataUrl) {
+export function getUserBanner(avatarPath) {
+    const data = getUserData(avatarPath);
+    return data.banner || null;
+}
+
+export function saveUserData(avatarPath, data) {
     const settings = getSettings();
     if (!settings.userBanners) {
         settings.userBanners = {};
     }
-    settings.userBanners[userAvatar] = bannerDataUrl;
+    
+    const existing = getUserData(avatarPath);
+    settings.userBanners[avatarPath] = { ...existing, ...data };
+    
     saveSettings();
+}
+
+export function saveUserBanner(userAvatar, bannerDataUrl, sourceDataUrl = undefined) {
+    const data = { banner: bannerDataUrl };
+    if (sourceDataUrl !== undefined) data.source = sourceDataUrl;
+    saveUserData(userAvatar, data);
+}
+
+export function saveUserColors(userAvatar, accentColor, quoteColor) {
+    saveUserData(userAvatar, { accentColor, quoteColor });
 }
 
 export function removeUserBanner(avatarPath) {
-    const settings = getSettings();
-    delete settings.userBanners[avatarPath];
-    saveSettings();
+    saveUserData(avatarPath, { banner: "" });
 }
 
-export function createBannerElement(bannerDataUrl, height, mesElement, isMoonlit = false) {
+export function deleteUserCustomImage(avatarPath) {
+    saveUserData(avatarPath, { banner: "", source: "" });
+}
+
+export function createBannerElement(bannerDataUrl, isMoonlit = false) {
     const banner = document.createElement('div');
     banner.className = 'avatar-banner';
 
-    const mesStyle = window.getComputedStyle(mesElement);
-    const borderRadius = mesStyle.borderRadius || '0px';
-
     const safeUrl = bannerDataUrl.replace(/"/g, '\\"').replace(/\n/g, '').replace(/\r/g, '');
 
-    let cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        --banner-height: ${height}px;
-        height: var(--banner-height);
-        background: url("${safeUrl}") top center no-repeat;
-        background-size: cover;
-        mask-image: linear-gradient(to bottom, black 60%, rgba(0,0,0,0) 100%);
-        -webkit-mask-image: linear-gradient(to bottom, black 60%, rgba(0,0,0,0) 100%);
-    `;
-
-    if (!isMoonlit) {
-        cssText += `
-        mask-size: 100% 100%;
-        mask-repeat: no-repeat;
-        -webkit-mask-size: 100% 100%;
-        -webkit-mask-repeat: no-repeat;
-        z-index: 1;
-        pointer-events: none;
-        border-top-left-radius: ${borderRadius};
-        border-top-right-radius: ${borderRadius};
-        `;
-    }
-
-    banner.style.cssText = cssText;
+    // Only set the dynamic background image URL variable
+    banner.style.setProperty('--banner-url', `url("${safeUrl}")`);
 
     return banner;
 }
