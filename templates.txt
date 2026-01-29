@@ -1,0 +1,338 @@
+/* @TEMPLATE: STANDARD */
+
+/* @BANNER_START */
+#chat {{selector}}::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: {{bannerHeight}};
+    background: url("{{bannerUrl}}") top center no-repeat;
+    background-size: cover;
+    mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    mask-size: 100% 100%;
+    mask-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    -webkit-mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    z-index: 2;
+    pointer-events: none;
+}
+
+body.bubblechat #chat {{selector}}::before {
+    border-radius: 10px;
+}
+/* @BANNER_END */
+
+#chat {{selector}} {
+    position: relative;
+    /* @PADDING_START */
+    padding: calc({{bannerHeight}} * 0.8) 1.5vw 1vh !important;
+    /* @PADDING_END */
+    background:
+        linear-gradient(
+            to top,
+            rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.5) 0px,
+            {{blurTintColor}} 50px);
+    border: rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.7) solid 2px !important;
+    box-shadow: 3px 3px 10px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.25) !important;
+    overflow: visible !important;
+}
+
+{{selector}} .mes_block,
+{{selector}} .mes_text,
+{{selector}} .ch_name,
+{{selector}} .avatar {
+    position: relative;
+    z-index: 3;
+}
+
+{{selector}} .ch_name,
+{{selector}} .mes_block {
+    overflow: visible !important;
+}
+
+#chat {{selector}} .avatar {
+    display: none !important;
+}
+
+#chat {{selector}} .name_text {
+    display: inline-flex !important;
+    align-items: baseline;
+    font-size: {{fontSize}} !important;
+    font-family: {{fontFamily}} !important;
+    text-align: left;
+    padding: {{namePaddingTB}} {{namePaddingLR}} !important;
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.8),
+        rgba({{accentR}}, {{accentG}}, {{accentB}}, 1)
+    );
+    filter: drop-shadow(0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.5));
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent;
+    text-shadow: none;
+    padding-right: 0.2em !important;
+    margin-right: -0.2em !important;
+    overflow: visible !important;
+    white-space: normal !important;
+}
+
+{{selector}} .name_text img,
+{{selector}} .name_text span,
+{{selector}} .name_text svg,
+{{selector}} .icon-svg,
+{{selector}} .timestamp {
+    fill: currentColor;
+    height: 14px;
+    aspect-ratio: 1;
+    place-self: unset;
+    margin-right: 5px;
+    white-space: nowrap;
+}
+
+{{selector}} .mes_buttons,
+{{selector}} .extraMesButtons {
+    position: relative;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    overflow: visible;
+    align-items: center;
+}
+
+{{selector}} .mes_button,
+{{selector}} .extraMesButtons > div {
+    place-self: center baseline;
+    align-self: center;
+    font-size: 14px;
+    padding: 5px;
+    margin-left: 3px;
+    border-radius: 50%;
+    background: linear-gradient(
+        to bottom,
+        rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.8),
+        rgba(255, 255, 255, 0.5)
+    );
+    color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.8);
+    transition: all 0.3s ease-in-out;
+}
+
+{{selector}} {
+    --SmartThemeQuoteColor: {{quoteColor}} !important;
+}
+
+/* @END: STANDARD */
+
+
+/* @TEMPLATE: MOONLIT */
+
+/* @BANNER_START */
+{{selector}} .mes_block::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: {{bannerHeight}};
+    background: url("{{bannerUrl}}") top center no-repeat;
+    background-size: cover;
+    mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    mask-size: 100% 100%;
+    mask-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    -webkit-mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    z-index: 1;
+    pointer-events: none;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    overflow: hidden;
+}
+/* @BANNER_END */
+
+{{selector}} .mes_block {
+    position: relative;
+    /* @PADDING_START */
+    padding: calc({{bannerHeight}} * 0.8) 1.5vw 1vh !important;
+    /* @PADDING_END */
+    background:
+        linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.3) 0%,
+            rgba(0, 0, 0, 0) 90%,
+            rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.5) 100%
+        ),
+        var(--SmartThemeBlurTintColor);
+    border: rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.7) solid 2px !important;
+    box-shadow: 3px 3px 10px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.25) !important;
+    overflow: visible !important;
+}
+
+{{selector}} .mes_block,
+{{selector}} .mes_text,
+{{selector}} .ch_name {
+    position: relative;
+    z-index: 2;
+    overflow: visible !important;
+}
+
+#chat {{selector}} .avatar {
+    display: none !important;
+}
+
+#chat {{selector}} .name_text {
+    display: inline-flex !important;
+    align-items: baseline;
+    font-size: {{fontSize}} !important;
+    font-family: {{fontFamily}};
+    text-align: left;
+    padding: {{namePaddingTB}} {{namePaddingLR}};
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.8),
+        rgba({{accentR}}, {{accentG}}, {{accentB}}, 1)
+    );
+    filter: drop-shadow(0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.5));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    text-shadow: none;
+    padding-right: 0.2em !important;
+    margin-right: -0.2em !important;
+    overflow: visible !important;
+    white-space: normal !important;
+}
+
+{{selector}} .name_text img,
+{{selector}} .name_text span,
+{{selector}} .name_text svg,
+{{selector}} .icon-svg,
+{{selector}} .timestamp {
+    fill: currentColor;
+    height: 0.875rem;
+    aspect-ratio: 1;
+    place-self: unset;
+    margin-right: 5px;
+    white-space: nowrap;
+}
+
+#chat {{selector}} .timestamp,
+#chat {{selector}} .icon-svg,
+#chat {{selector}} .timestamp-icon {
+    aspect-ratio: auto !important;
+    place-self: auto !important;
+    margin-right: -0.3rem !important;
+    margin-left: 0.5rem;
+}
+
+{{selector}} .mes_buttons,
+{{selector}} .extraMesButtons {
+    position: relative;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    overflow: visible;
+    align-items: center;
+}
+
+{{selector}} .mes_button,
+{{selector}} .extraMesButtons > div {
+    place-self: center baseline;
+    align-self: center;
+    font-size: 0.875rem;
+    padding: 5px;
+    margin-left: 3px;
+    border-radius: 50%;
+    background: linear-gradient(
+        to bottom,
+        rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.8),
+        rgba(255, 255, 255, 0.5)
+    );
+    color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 5px rgba({{accentR}}, {{accentG}}, {{accentB}}, 0.8);
+    transition: all 0.3s ease-in-out;
+}
+
+{{selector}} {
+    --SmartThemeQuoteColor: {{quoteColor}} !important;
+}
+
+/* @END: MOONLIT */
+
+
+/* @TEMPLATE: PANEL_STANDARD */
+
+body.has-panel-banner #CharListButtonAndHotSwaps {
+    margin-bottom: 150px;
+}
+
+body.has-panel-banner #CharListButtonAndHotSwaps + hr {
+    display: none !important;
+}
+
+body.big-avatars.has-panel-banner #right-nav-panel-tabs::after {
+    top: 120px;
+}
+
+body.has-panel-banner #right-nav-panel-tabs::after {
+    content: "";
+    position: absolute;
+    top: 90px;
+    left: 0;
+    width: 100%;
+    height: 150px;
+    background: url("{{bannerUrl}}") top center no-repeat;
+    background-size: cover;
+    mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    mask-size: 100% 100%;
+    mask-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    -webkit-mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* @END: PANEL_STANDARD */
+
+
+/* @TEMPLATE: PANEL_MOONLIT */
+
+body.has-panel-banner-moonlit #CharListButtonAndHotSwaps {
+    margin-bottom: 130px !important;
+}
+
+body.has-panel-banner-moonlit #CharListButtonAndHotSwaps + hr {
+    display: none !important;
+}
+
+body.big-avatars.has-panel-banner-moonlit #right-nav-panel-tabs::after {
+    top: 140px;
+}
+
+body.has-panel-banner-moonlit #right-nav-panel-tabs::after {
+    content: "";
+    position: absolute;
+    top: 80px;
+    left: 0;
+    width: 100%;
+    height: 150px;
+    background: url("{{bannerUrl}}") top center no-repeat;
+    background-size: cover;
+    mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    mask-size: 100% 100%;
+    mask-repeat: no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, rgba(0, 0, 0, 0) 100%);
+    -webkit-mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* @END: PANEL_MOONLIT */
