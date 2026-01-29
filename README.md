@@ -3,7 +3,13 @@
 
 Inspired by @Rivelle from [a CSS snippet she shared on SillyTavern's discord](https://discord.com/channels/1100685673633153084/1335308918259454122) and I loved it so I wanted an easier way to set it up, more userfriendly for people who don't want to fumble with CSS or a more accessible way to set the banner. 
 
-21-01: Now with compatibility with [Moonlit Echoes theme](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme). If you have Moonlit Echoes installed it will apply to the bubble and flat style automatically. No other styles would be affected, they are already beautifully crafted.
+---
+
+### Updates
+
+**21/01**: Now with compatibility with [Moonlit Echoes theme](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme). If you have Moonlit Echoes installed it will apply to the bubble and flat style automatically. No other styles would be affected, they are already beautifully crafted.
+
+**29/01**: Added more personalization by uploading a second image to use as a banner, editing the accent color and the quote color per character and persona
 
 > [!Important]
 > This extension has been created with Claude. Vibecoded if you will. If you don't trust it, you don't like it or you don't support it is absolutely fine, this was to scratch my own itch more than anything and I use it myself.
@@ -28,10 +34,15 @@ https://github.com/phampyk/SillyTavern-AvatarBanner/
 - **Font size**: The font size for the name
 - **Name Padding**: T/B is for top and botom, L/R for left and right. If your name text shows clipped play with this settings until it shows. If the font looks fine there's no need to touch it. Useful for bigger fonts like '[Pacifico](https://fonts.google.com/specimen/Pacifico)'
 
-![Settings user](/img/screenshot-user.png)
 ![Settings char](/img/screenshot-char.png)
 
-To select the part of the image you want to see on the banner search for the icon on the respective persona or character and it will open the image cropper, drag the rectangle and press `Save Banner`. Once the banner is set if you press the icon again you can `Edit` the selection or `Remove` to remove the banner and the chat would become a normal one again, banner and styling will disappear.
+You will find the buttons and color pickers on the character and persona character.
+
+- The `panorama icon` will let you crop what part of the avatar you want as a banner
+- The `upload icon` will let you upload or delete an extra image to use as a banner
+- The `edit button` will let you recrop whatever image you already have as a banner or remove the banner completely
+- The `accent color` picker will change the name, border and bottom gradient color
+- The `quote color` will change the color for the quote text of the character (whatever is between " ")
 
 ## Screenshots
 
@@ -39,9 +50,13 @@ To select the part of the image you want to see on the banner search for the ico
 
 It works on group chats, you have to select the banner per character in their single character settings.
 
+![Banners in group chat with customization](/img/screenshot-groupwithcolors.png)
+
+Group with different colors per character, to help differentiate each character.
+
 ![Banners without user](/img/screenshot-nouserbanner.png)
 
-Image of the chat with the character only banner
+Image of the chat with the character only banner.
 
 ## Troubleshoot
 If your font doesn't show up after writting the name (it happened to me with the font '[Molle](https://fonts.google.com/specimen/Molle)') you will have to copy the whole @import code. To get this you need to go to the font page, press the button `Get Font` then the bag icon at the top right.
