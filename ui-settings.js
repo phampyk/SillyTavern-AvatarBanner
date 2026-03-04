@@ -95,6 +95,18 @@ export function createSettingsPanel(getSettings, saveSettings, regenerateCSS, Ex
                         <input class="neo-range-input" type="number" min="0" max="0.556" step="0.028" id="avatar_banner_namepad_lr_counter" value="${Number.isFinite(settings.namePaddingLR) ? settings.namePaddingLR : 0}">
                     </div>
                 </div>
+
+                <div class="avatar-banner-grid-row ${disabledClass}" id="avatar_banner_gradient_row">
+                    <div class="alignitemscenter flex-container flexFlowColumn flexBasis48p flexGrow flexShrink gap0">
+                        <small>
+                            <span>Gradient Coverage (px)</span>
+                            <div class="fa-solid fa-circle-info opacity50p" title="Height of the bottom bubble gradient from 0px (none) to 350px (full)"></div>
+                        </small>
+                        <input class="neo-range-slider" type="range" id="avatar_banner_gradient" min="0" max="350" step="1" value="${settings.gradientCoverage}">
+                        <input class="neo-range-input" type="number" min="0" max="350" step="1" id="avatar_banner_gradient_counter" value="${settings.gradientCoverage}">
+                    </div>
+                    <div style="min-height: 1px;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -228,6 +240,29 @@ export function createSettingsPanel(getSettings, saveSettings, regenerateCSS, Ex
                 updateNamePaddingLR(e.target.value);
             });
         }
+
+        // Gradient coverage slider
+        const gradientSlider = document.getElementById('avatar_banner_gradient');
+        const gradientCounter = document.getElementById('avatar_banner_gradient_counter');
+
+        const updateGradientCoverage = (value) => {
+            const settings = getSettings();
+            settings.gradientCoverage = parseInt(value);
+            saveSettings();
+            regenerateCSS();
+        };
+
+        if (gradientSlider && gradientCounter) {
+            gradientSlider.addEventListener('input', (e) => {
+                gradientCounter.value = e.target.value;
+                updateGradientCoverage(e.target.value);
+            });
+
+            gradientCounter.addEventListener('input', (e) => {
+                gradientSlider.value = e.target.value;
+                updateGradientCoverage(e.target.value);
+            });
+        }
         
         // Extra styling toggle
         document.getElementById('avatar_banner_extra_styling').addEventListener('change', (e) => {
@@ -239,17 +274,20 @@ export function createSettingsPanel(getSettings, saveSettings, regenerateCSS, Ex
             const colorRow = document.getElementById('avatar_banner_color_row');
             const fontSizeRow = document.getElementById('avatar_banner_fontsize_row');
             const namePaddingRow = document.getElementById('avatar_banner_namepadding_row');
+            const gradientRow = document.getElementById('avatar_banner_gradient_row');
             
             if (e.target.checked) {
                 fontRow.classList.remove('disabled');
                 colorRow.classList.remove('disabled');
                 fontSizeRow.classList.remove('disabled');
                 namePaddingRow?.classList.remove('disabled');
+                gradientRow?.classList.remove('disabled');
             } else {
                 fontRow.classList.add('disabled');
                 colorRow.classList.add('disabled');
                 fontSizeRow.classList.add('disabled');
                 namePaddingRow?.classList.add('disabled');
+                gradientRow?.classList.add('disabled');
             }
             
             regenerateCSS();

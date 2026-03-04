@@ -141,3 +141,44 @@ export function areColorsEqual(color1, color2) {
            Math.abs(rgb1.g - rgb2.g) < 3 &&
            Math.abs(rgb1.b - rgb2.b) < 3;
 }
+// Check if banners should be shown for current chat style
+// Only Flat and Bubble styles support banners (not Document or Moonlit styles)
+export function shouldShowBanner() {
+    const body = document.body;
+    
+    const hasBubble = body.classList.contains('bubblechat');
+    const hasDocument = body.classList.contains('documentstyle');
+    
+    // Check for Moonlit custom styles (Echo, Whisper, Hush, Ripple, Tide)
+    const hasMoonlitStyle = 
+        body.classList.contains('echostyle') ||
+        body.classList.contains('whisperstyle') ||
+        body.classList.contains('hushstyle') ||
+        body.classList.contains('ripplestyle') ||
+        body.classList.contains('tidestyle');
+    
+    // Flat is default (no bubblechat, no documentstyle, no moonlit style)
+    const hasFlat = !hasBubble && !hasDocument && !hasMoonlitStyle;
+    
+    // Show banners for Flat or Bubble only
+    return hasFlat || hasBubble;
+}
+
+// Check if Smart Dialogue Colorizer (SDC) name coloring is enabled
+// Only use SDC's color for name gradient if this returns true
+export function isSDCNameColoringEnabled() {
+    try {
+        // Check if extension_settings exists (SillyTavern global)
+        if (!window.extension_settings) return false;
+        
+        // Check if SDC is installed
+        const sdcSettings = window.extension_settings['SillyTavern-Smart-Dialogue-Colorizer'];
+        if (!sdcSettings) return false;
+        
+        // Check if name coloring is enabled for characters
+        return sdcSettings.charColorSettings?.colorNameText === true;
+    } catch (error) {
+        console.error(`[${extensionName}]`, 'Error checking SDC name coloring:', error);
+        return false;
+    }
+}

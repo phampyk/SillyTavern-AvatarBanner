@@ -175,14 +175,10 @@ async function openBannerEditor(avatarPath, displayName, isUser = false, charact
     }
 
     if (!dataUrl) {
-        // For Moonlit theme, use thumbnail to avoid fetching huge character cards (can be 20MB+)
-        // Default ST uses medium quality thumbnails already, but Moonlit recommends high-res settings
-        const useThumbnail = !isUser && isMoonlitTheme(getSettings());
+        // Always use full-resolution avatar for best banner quality
         let avatarUrl = isUser 
             ? getPersonaImageUrlFullRes(avatarPath) 
-            : useThumbnail 
-                ? `/thumbnail?type=avatar&file=${encodeURIComponent(avatarPath)}`
-                : `/characters/${avatarPath}`;
+            : `/characters/${avatarPath}`;
         try {
             const blob = await (await fetch(avatarUrl)).blob();
             const reader = new FileReader();

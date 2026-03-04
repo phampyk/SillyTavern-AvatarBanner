@@ -5,7 +5,8 @@
  * with user settings, and injects the final CSS into the document.
  */
 
-import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCurrentUserAvatar, isMoonlitTheme, hexToRgb, isValidImageDataUrl } from './utils.js';
+import { isGroupChat, getCurrentGroup, getCharacterIdByAvatar, getCurrentUserAvatar, isMoonlitTheme, hexToRgb, isValidImageDataUrl, shouldShowBanner } from './utils.js';
+import { isSDCNameColoringEnabled } from './utils.js';
 import { getCharacterData, getUserData } from './banner-manager.js';
 import { getGoogleFontImport, preloadGoogleFont, getFontFamilyName } from './fonts.js';
 
@@ -58,7 +59,7 @@ async function loadTemplates() {
  * Process a template with given values
  * @param {string} templateName - Name of template (STANDARD, MOONLIT, etc.)
  * @param {object} values - Placeholder values to substitute
- * @param {object} options - Options like { includeBanner: true/false }
+ * @param {object} options - Options like { includeBanner: true/false, extraStyling: true/false }
  * @returns {string} Processed CSS
  */
 function processTemplate(templateName, values, options = {}) {
@@ -74,6 +75,12 @@ function processTemplate(templateName, values, options = {}) {
         css = css.replace(/\/\* @BANNER_START \*\/[\s\S]*?\/\* @BANNER_END \*\//g, '');
         // Remove padding lines
         css = css.replace(/\/\* @PADDING_START \*\/[\s\S]*?\/\* @PADDING_END \*\//g, '');
+    }
+
+    // If extra styling disabled, strip the extra styling blocks
+    if (!options.extraStyling) {
+        // Remove everything between @EXTRA_START and @EXTRA_END
+        css = css.replace(/\/\* @EXTRA_START \*\/[\s\S]*?\/\* @EXTRA_END \*\//g, '');
     }
 
     // Substitute all placeholders
@@ -118,6 +125,7 @@ function buildBaseValues(settings, accentRGB, quoteColor, isUser = false) {
         fontFamily: fontFamily ? `"${fontFamily}", cursive` : '"Caveat", cursive',
         namePaddingTB: `${settings.namePaddingTB}em`,
         namePaddingLR: `${settings.namePaddingLR}em`,
+        gradientCoverage: `${settings.gradientCoverage}px`,
         accentR: accentRGB.r,
         accentG: accentRGB.g,
         accentB: accentRGB.b,
@@ -167,6 +175,13 @@ async function _generateCSSInternal() {
             return;
         }
 
+        // Only show banners for Flat and Bubble chat styles
+        // Document style and all Moonlit styles (Echo, Whisper, Hush, Ripple, Tide) don't get banners
+        if (!shouldShowBanner()) {
+            cleanupCSS();
+            return;
+        }
+
         // Load templates if not cached
         await loadTemplates();
         if (!templates || Object.keys(templates).length === 0) {
@@ -180,8 +195,8 @@ async function _generateCSSInternal() {
         
         let cssOutput = '/* Avatar Banner - Generated CSS */\n\n';
 
-        // Add font import if custom font set
-        if (settings.fontFamily) {
+        // Add font import if custom font set AND extra styling enabled
+        if (settings.fontFamily && settings.extraStylingEnabled) {
             const fontImport = getGoogleFontImport(settings.fontFamily);
             if (fontImport) {
                 cssOutput += fontImport + '\n\n';
@@ -235,7 +250,13 @@ async function _generateCSSInternal() {
             };
 
             cssOutput += `/* Character: ${name} */\n`;
-            cssOutput += processTemplate(templateName, values, { includeBanner: true });
+            cssOutput += processTemplate(templateName, values, { includeBanner: true, extraStyling: settings.extraStylingEnabled });
+            // SDC integration: Use SDC's character color only if SDC name coloring is enabled
+            if (isSDCNameColoringEnabled()) {
+                cssOutput += `/* SDC Color Integration */\n`;
+                cssOutput += `${originalSelector} .name_text { --avatar-banner-accent: var(--character-color) !important; }\n`;
+                cssOutput += `${originalSelector} .mes_block .name_text { --avatar-banner-accent: var(--character-color) !important; }\n\n`;
+            }
             cssOutput += '\n\n';
 
             // Handle _originalName for chat-name extension compatibility
@@ -247,7 +268,13 @@ async function _generateCSSInternal() {
                 const originalValues = { ...values, selector: originalSelector };
                 
                 cssOutput += `/* Character (original name): ${originalName} */\n`;
-                cssOutput += processTemplate(templateName, originalValues, { includeBanner: true });
+                cssOutput += processTemplate(templateName, originalValues, { includeBanner: true, extraStyling: settings.extraStylingEnabled });
+            // SDC integration: Use SDC's character color only if SDC name coloring is enabled
+            if (isSDCNameColoringEnabled()) {
+                cssOutput += `/* SDC Color Integration */\n`;
+                cssOutput += `${originalSelector} .name_text { --avatar-banner-accent: var(--character-color) !important; }\n`;
+                cssOutput += `${originalSelector} .mes_block .name_text { --avatar-banner-accent: var(--character-color) !important; }\n\n`;
+            }
                 cssOutput += '\n\n';
             }
         }
@@ -286,7 +313,7 @@ async function _generateCSSInternal() {
                 };
 
                 cssOutput += `/* User/Persona */\n`;
-                cssOutput += processTemplate(templateName, values, { includeBanner: includeUserBanner });
+                cssOutput += processTemplate(templateName, values, { includeBanner: includeUserBanner, extraStyling: settings.extraStylingEnabled });
                 cssOutput += '\n\n';
             }
         }
@@ -303,7 +330,7 @@ async function _generateCSSInternal() {
                 };
 
                 cssOutput += `/* Panel Banner */\n`;
-                cssOutput += processTemplate(panelTemplateName, panelValues, { includeBanner: true });
+                cssOutput += processTemplate(panelTemplateName, panelValues, { includeBanner: true, extraStyling: settings.extraStylingEnabled });
                 cssOutput += '\n\n';
 
                 // Add body class for panel banner CSS

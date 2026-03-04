@@ -13,6 +13,7 @@ const ExtensionState = {
     cleanupFunctions: [],
     observer: null,
     initialized: false,
+    bodyObserver: null,
     currentLoadedFont: null,
     lastQuoteColor: null,  // Track quote color to avoid unnecessary picker reloads
 };
@@ -157,6 +158,37 @@ function setupMutationObserver() {
     });
 }
 
+
+/**
+ * Setup observer for body class changes (chat display style changes)
+ */
+function setupBodyClassObserver() {
+    const body = document.body;
+    if (!body) return;
+    
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                regenerateCSSImmediate();
+                break;
+            }
+        }
+    });
+    
+    observer.observe(body, {
+        attributes: true,
+        attributeFilter: ['class']
+    });
+    
+    ExtensionState.bodyObserver = observer;
+    
+    ExtensionState.cleanupFunctions.push(() => {
+        if (ExtensionState.bodyObserver) {
+            ExtensionState.bodyObserver.disconnect();
+            ExtensionState.bodyObserver = null;
+        }
+    });
+}
 function cleanup() {
     try {
         ExtensionState.cleanupFunctions.forEach(fn => {
@@ -171,6 +203,11 @@ function cleanup() {
         if (ExtensionState.observer) {
             ExtensionState.observer.disconnect();
             ExtensionState.observer = null;
+
+        if (ExtensionState.bodyObserver) {
+            ExtensionState.bodyObserver.disconnect();
+            ExtensionState.bodyObserver = null;
+        }
         }
 
         // Clean up generated CSS
@@ -240,6 +277,7 @@ async function init() {
 
         // Setup UI observer
         setupMutationObserver();
+        setupBodyClassObserver();
 
         // Initial render
         setTimeout(() => {
