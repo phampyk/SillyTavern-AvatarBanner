@@ -4,7 +4,6 @@
    ============================================ */
 
 .avatar-banner-settings .inline-drawer-content {
-    display: flex;
     flex-direction: column;
     gap: 10px;
     padding-bottom: 10px;

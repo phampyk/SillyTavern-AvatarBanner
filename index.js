@@ -161,15 +161,38 @@ function setupMutationObserver() {
 
 /**
  * Setup observer for body class changes (chat display style changes)
+ * Only regenerates CSS when chat display style actually changes
+ * Verified to work with Standard (bubblechat, documentstyle) and Moonlit (echostyle, whisperstyle, etc.) themes
  */
 function setupBodyClassObserver() {
     const body = document.body;
     if (!body) return;
     
+    // All known chat style classes (Standard + Moonlit)
+    // Source: SillyTavern power-user.js & MoonlitEchoes slash-commands.js
+    const chatStyleClasses = [
+        'bubblechat',      // Standard style 1
+        'documentstyle',   // Standard style 2
+        'echostyle',       // Moonlit style 3
+        'whisperstyle',    // Moonlit style 4
+        'hushstyle',       // Moonlit style 5
+        'ripplestyle',     // Moonlit style 6
+        'tidestyle',       // Moonlit style 7
+    ];
+    
+    // Track which style is currently active
+    let lastStyle = chatStyleClasses.find(cls => body.classList.contains(cls)) || null;
+    
     const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                regenerateCSSImmediate();
+                // Check if any chat style class changed
+                const currentStyle = chatStyleClasses.find(cls => body.classList.contains(cls)) || null;
+                
+                if (currentStyle !== lastStyle) {
+                    lastStyle = currentStyle;
+                    regenerateCSSImmediate();
+                }
                 break;
             }
         }
